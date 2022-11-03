@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  app:
+    build: .
+    command: go run .
+    ports:
+      - 8080:8080
+    working_dir: /app
+    volumes:
+    - .:/app
+    - cache:/go
+
+volumes:
+  cache:
