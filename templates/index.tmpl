@@ -1,14 +1,18 @@
-<html><head></head><body>
-<form method="POST" action="/signin">
-<input type="hidden" name="csrf" value="{{.csrf}}" required>
-<input type="hidden" name="client_id" value="{{.clientID}}" required>
-<input type="hidden" name="redirect_uri" value="{{.redirectURI}}" required>
-<input type="hidden" name="response_type" value="{{.responseType}}" required>
-<input type="hidden" name="scope" value="{{.scope}}" required>
-<input type="hidden" name="state" value="{{.state}}">
-<input type="text" name="username" required>
-<input type="password" name="password" required>
-<button>submit</button>
-</form>
-<body></html>
+<html>
+  <head>
+  </head>
+  <body>
+    <form method="POST" action="/signin">
+    <input type="hidden" name="csrf" value="{{.csrf}}" required>
+    <input type="hidden" name="client_id" value="{{.clientID}}" required>
+    <input type="hidden" name="redirect_uri" value="{{.redirectURI}}" required>
+    <input type="hidden" name="response_type" value="{{.responseType}}" required>
+    <input type="hidden" name="scope" value="{{.scope}}" required>
+    <input type="hidden" name="state" value="{{.state}}">
+    <input type="text" name="username" required>
+    <input type="password" name="password" required>
+    <button>submit</button>
+  </form>
+  <body>
+</html>
 
