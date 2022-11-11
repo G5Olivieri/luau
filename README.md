@@ -1,50 +1,56 @@
-# Learning OAuth2
+# Learning OAuth2 (LUAU)
 
 # Tech Stack
 
 - golang 1.19
   - go-gin
-- SQLite3 (db/luau.db)
 
-## AuthN
+## Client Registration
 
-### CTL CLI
+- Hardcoded
+  - `openidconnect/client_repository.go`
 
-- updates database directly
+## Sign up
 
-### Sign up
+- Hardcoded
+  - `openidconnect/authenticate.go`
 
-Sign up a new user flow via CTL CLI:
-
-- Create a new client
-  - Define redirect uri to client
-- Create a new account to tinent
-- Define username and password to account
-
-### Sign in
+## Sign in
 
 - OAuth2
   - [Authorization Code](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
   - [PKCE](https://oauth.net/2/pkce/)
 
-Example
+Example:
+
+Redirect to signin
 
 ```
 HTTP/1.1 302 Found
-Location: https://luau.com/tinent/123/authorize?
+Location: https://luau.com/authenticate?
     response_type=code
     &scope=openid
     &client_id=
     &redirect_uri=
-    &code_challenge=
-    &code_challenge_method=
-    &state=
 ```
 
-### Session
+Request Token
 
-- Stateless HMAC512 JWT
+```
+POST /token HTTP/1.1
+Server: https://luau.com
+Content-Type: application/x-www-form-urlencoded
 
-### Sign out
+grant_type=authorization_code
+client_id=
+redirect_uri=
+```
 
-- delete JWT locally
+## Session
+
+- Stateless HMAC256 JWT
+  - secret is client_secret
+
+## Sign out
+
+- Delete JWT locally
