@@ -1,9 +1,12 @@
 package openidconnect
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
+	"os"
+	"strconv"
 )
 
-var secret = []byte("SECRET")
-var mac = hmac.New(sha256.New, secret)
+var (
+	expiresIn, _ = strconv.ParseUint(os.Getenv("EXPIRES_IN"), 10, 32)
+	issuer       = os.Getenv("ISSUER")
+	secret       = []byte(os.Getenv("SECRET"))
+)

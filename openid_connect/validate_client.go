@@ -6,19 +6,20 @@ import (
 	"github.com/google/uuid"
 )
 
-func validateClient(id, redirectURI string, repository ClientRepository) error {
+func validateClient(id, redirectURI string, repository ClientRepository) (Client, error) {
 	clientID, err := uuid.Parse(id)
+
 	if err != nil {
-		return err
+		return Client{}, err
 	}
 
 	client, err := repository.GetClientById(clientID)
 	if err != nil {
-		return err
+		return client, err
 	}
 
 	if client.RedirectURI.String() != redirectURI {
-		return errors.New("Invalid client")
+		return Client{}, errors.New("Invalid client")
 	}
-	return nil
+	return client, nil
 }

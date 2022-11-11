@@ -4,6 +4,10 @@ services:
   app:
     build: .
     command: go run .
+    environment:
+      EXPIRES_IN: 1800
+      ISSUER: https://luau.com
+      SECRET: obtLtyy1PTEcDL33ItvjhXwiiEjzERSaNDKmmnhuk2JdsSXR8nH7Dq75NbCqRZKB8TR7Fqth
     ports:
       - 8080:8080
     working_dir: /app

@@ -2,6 +2,7 @@ package openidconnect
 
 import (
 	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
 	"net/url"
@@ -21,6 +22,8 @@ type SigninRequest struct {
 	State                    string `form:"state"`
 }
 
+// TODO: validate from database
+// TODO: hash password
 func authenticate(username, password string) bool {
 	return username == "Glayson" && password == "Murollo"
 }
@@ -44,7 +47,7 @@ func SiginHandler(c *gin.Context) {
 		return
 	}
 
-	mac.Reset()
+	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(request.Csrf))
 	expectedCsrf := mac.Sum(nil)
 
@@ -53,14 +56,15 @@ func SiginHandler(c *gin.Context) {
 		return
 	}
 
-	if err := validateAuthorizationRequest(request.AuthorizationCodeRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// TODO: inject repository
+	client, err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -70,22 +74,19 @@ func SiginHandler(c *gin.Context) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		// TODO: fetch from database
 		"sub": "Glayson",
 		"aud": request.ClientID,
 		"exp": time.Now().Add(5 * time.Second).Unix(),
 	})
 
-	tokenString, err := token.SignedString(secret)
+	tokenString, err := token.SignedString(client.Secret)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	uri, err := url.Parse(request.RedirectURI)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
+	uri := client.RedirectURI
 	q, _ := url.ParseQuery(uri.RawQuery)
 	q.Add("code", tokenString)
 	uri.RawQuery = q.Encode()

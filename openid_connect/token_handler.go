@@ -38,7 +38,7 @@ func TokenHandler(c *gin.Context) {
 		return
 	}
 
-	err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
+	client, err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -49,7 +49,7 @@ func TokenHandler(c *gin.Context) {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
 
-		return secret, nil
+		return client.Secret, nil
 	})
 
 	if err != nil {
@@ -66,16 +66,16 @@ func TokenHandler(c *gin.Context) {
 
 	tokenGenerated := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": claims["sub"],
-		"aud": request.ClientID,
-		"iss": "https://luau.com",
-		"exp": time.Now().Add(30 * time.Minute).Unix(),
+		"aud": client.ID.String(),
+		"iss": issuer,
+		"exp": time.Now().Add(time.Duration(expiresIn) * time.Second).Unix(),
 	})
 
-	tokenString, err := tokenGenerated.SignedString(secret)
+	tokenString, err := tokenGenerated.SignedString(client.Secret)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"access_token": tokenString, "expires_in": 1800})
+	c.JSON(http.StatusOK, gin.H{"access_token": tokenString, "expires_in": expiresIn})
 }

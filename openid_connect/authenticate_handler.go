@@ -1,6 +1,8 @@
 package openidconnect
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
 
@@ -25,14 +27,15 @@ func AuthenticateHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{}); err != nil {
+
+	_, err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
+	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
+	mac := hmac.New(sha256.New, secret)
 	csrf := uuid.New().String()
-
-	mac.Reset()
 	mac.Write([]byte(csrf))
 	csrfMac := base64.URLEncoding.EncodeToString(mac.Sum(nil))
 
