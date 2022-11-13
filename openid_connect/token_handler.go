@@ -69,6 +69,7 @@ func TokenHandler(c *gin.Context) {
 		"aud": client.ID.String(),
 		"iss": issuer,
 		"exp": time.Now().Add(time.Duration(expiresIn) * time.Second).Unix(),
+		"iat": time.Now().Unix(),
 	})
 
 	tokenString, err := tokenGenerated.SignedString(client.Secret)

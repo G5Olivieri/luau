@@ -18,9 +18,9 @@ func main() {
 	}))
 	r.LoadHTMLGlob("templates/*")
 
-	r.GET("/authenticate", openidconnect.AuthenticateHandler)
-	r.POST("/signin", openidconnect.SiginHandler)
-	r.POST("/token", openidconnect.TokenHandler)
+	r.GET("/openidconnect/authenticate", openidconnect.AuthenticateHandler)
+	r.POST("/openidconnect/signin", openidconnect.SiginHandler)
+	r.POST("/openidconnect/token", openidconnect.TokenHandler)
 
 	r.Run()
 }

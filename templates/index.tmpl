@@ -5,7 +5,7 @@
     <title>Luau Signin</title>
   </head>
   <body>
-    <form method="POST" action="/signin">
+    <form method="POST" action="/openidconnect/signin">
     <input type="hidden" name="csrf" value="{{.csrf}}" required>
     <input type="hidden" name="client_id" value="{{.clientID}}" required>
     <input type="hidden" name="redirect_uri" value="{{.redirectURI}}" required>
