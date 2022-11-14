@@ -10,15 +10,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type AuthenticateRequest struct {
+type AuthorizeRequest struct {
 	AuthorizationCodeRequest `form:",inline"`
 	ClientID                 string `form:"client_id"    binding:"required"`
 	RedirectURI              string `form:"redirect_uri" binding:"required"`
 	State                    string `form:"state"`
 }
 
-func AuthenticateHandler(c *gin.Context) {
-	var request AuthenticateRequest
+func AuthorizeHandler(c *gin.Context) {
+	var request AuthorizeRequest
 	if err := c.BindQuery(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
