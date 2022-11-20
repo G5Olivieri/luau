@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gmctechsols/luau/openid_connect/clients"
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -57,7 +58,7 @@ func SiginHandler(c *gin.Context) {
 	}
 
 	// TODO: inject repository
-	client, err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
+	client, err := validateClient(request.ClientID, request.RedirectURI, &clients.ClientDbRepository{})
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return

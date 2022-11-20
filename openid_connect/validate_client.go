@@ -3,14 +3,15 @@ package openidconnect
 import (
 	"errors"
 
+	"github.com/gmctechsols/luau/openid_connect/clients"
 	"github.com/google/uuid"
 )
 
-func validateClient(id, redirectURI string, repository ClientRepository) (Client, error) {
+func validateClient(id, redirectURI string, repository clients.ClientRepository) (clients.Client, error) {
 	clientID, err := uuid.Parse(id)
 
 	if err != nil {
-		return Client{}, err
+		return clients.Client{}, err
 	}
 
 	client, err := repository.GetClientById(clientID)
@@ -19,7 +20,7 @@ func validateClient(id, redirectURI string, repository ClientRepository) (Client
 	}
 
 	if client.RedirectURI.String() != redirectURI {
-		return Client{}, errors.New("Invalid client")
+		return clients.Client{}, errors.New("Invalid client")
 	}
 	return client, nil
 }

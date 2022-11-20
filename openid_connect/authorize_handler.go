@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gmctechsols/luau/openid_connect/clients"
 	"github.com/google/uuid"
 )
 
@@ -28,7 +29,8 @@ func AuthorizeHandler(c *gin.Context) {
 		return
 	}
 
-	_, err := validateClient(request.ClientID, request.RedirectURI, &ClientDummyRepository{})
+	// TODO: inject repository
+	_, err := validateClient(request.ClientID, request.RedirectURI, &clients.ClientDbRepository{})
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return

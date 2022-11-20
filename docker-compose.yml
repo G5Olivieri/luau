@@ -3,7 +3,7 @@ version: '3'
 services:
   app:
     build: .
-    command: go run .
+    command: go run main.go
     environment:
       EXPIRES_IN: 1800
       ISSUER: https://luau.com
@@ -13,7 +13,9 @@ services:
     working_dir: /app
     volumes:
     - .:/app
-    - cache:/go
+    - gopath:/go
+    - cache:/home/golang/.cache
 
 volumes:
+  gopath:
   cache:
