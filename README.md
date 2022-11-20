@@ -1,4 +1,6 @@
-# Learning OAuth2 (LUAU)
+# Learning OAuth2
+
+[LUAU](https://en.wikipedia.org/wiki/L%C5%AB%CA%BBau) is pronounced `/ˈlo͞oou/`
 
 # Tech Stack
 
@@ -7,8 +9,15 @@
 
 ## Client Registration
 
-- Hardcoded
-  - `openidconnect/client_repository.go`
+- via CLI CTL
+
+Example:
+
+```bash
+$ go build -o ./bin/luauctl cli.go
+$ ./bin/luauctl db create
+$ ./bin/luauctl clients create [NAME] [REDIRECT_URI]
+```
 
 ## Sign up
 
@@ -19,7 +28,7 @@
 
 - OAuth2
   - [Authorization Code](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
-  - [PKCE](https://oauth.net/2/pkce/)
+  - [PKCE](https://oauth.net/2/pkce/) - not implemented
 
 Example:
 
@@ -49,7 +58,7 @@ redirect_uri=
 ## Session
 
 - Stateless HMAC256 JWT
-  - secret is client_secret
+  - key is client_secret
 
 ## Sign out
 
