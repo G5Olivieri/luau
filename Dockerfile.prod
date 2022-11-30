@@ -1,0 +1,18 @@
+FROM golang:1.19-alpine as build
+
+WORKDIR /src
+
+RUN apk add -u --no-cache build-base sqlite
+
+COPY . /src
+
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o ./bin/app main.go
+
+FROM alpine
+
+WORKDIR /opt/app
+
+COPY --from=build /src/bin/app /opt/app/app
+COPY --from=build /src/templates /opt/app/templates
+
+CMD ["./app"]

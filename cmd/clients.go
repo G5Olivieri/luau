@@ -2,40 +2,23 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"log"
-	"math/rand"
-	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 )
 
-const charset = "abcdefghijklmnopqrstuvwxyz" +
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" +
-	"!@#$%^&*()_-=+,/.<>?'\\[]`~;:|{}"
-
-func StringWithCharset(length int, charset string) string {
-	var seededRand *rand.Rand = rand.New(
-		rand.NewSource(time.Now().UnixNano()))
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
-}
-
-func String(length int) string {
-	return StringWithCharset(length, charset)
-}
-
 func NewClientsCmd() *cobra.Command {
 	var (
 		secret       string
 		name         string
 		redirect_uri string
+		dbPath       string
 	)
 
 	clientsUpdateCmd := &cobra.Command{
@@ -43,7 +26,7 @@ func NewClientsCmd() *cobra.Command {
 		Short: "update client",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			db, err := sql.Open("sqlite3", "./db/clients.db")
+			db, err := sql.Open("sqlite3", dbPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -98,7 +81,7 @@ func NewClientsCmd() *cobra.Command {
 		Short: "Get client by ID",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			db, err := sql.Open("sqlite3", "./db/clients.db")
+			db, err := sql.Open("sqlite3", dbPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -122,7 +105,7 @@ func NewClientsCmd() *cobra.Command {
 		Short: "Delete a client",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			db, err := sql.Open("sqlite3", "./db/clients.db")
+			db, err := sql.Open("sqlite3", dbPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -152,7 +135,7 @@ func NewClientsCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all clients",
 		Run: func(cmd *cobra.Command, args []string) {
-			db, err := sql.Open("sqlite3", "./db/clients.db")
+			db, err := sql.Open("sqlite3", dbPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -193,7 +176,7 @@ func NewClientsCmd() *cobra.Command {
 		Short: "Create a new client",
 		Args:  cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			db, err := sql.Open("sqlite3", "./db/clients.db")
+			db, err := sql.Open("sqlite3", dbPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -203,11 +186,20 @@ func NewClientsCmd() *cobra.Command {
 				log.Fatal(err)
 			}
 			defer stmt.Close()
+			var secretBytes []byte
 			if secret == "" {
-				secret = StringWithCharset(72, charset)
+				secretBytes = make([]byte, 32)
+				_, err = rand.Read(secretBytes)
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				secretBytes = []byte(secret)
 			}
 
+			secret = base64.StdEncoding.EncodeToString(secretBytes)
 			id := uuid.New().String()
+
 			res, err := stmt.Exec(id, args[0], args[1], secret)
 			if err != nil {
 				log.Fatal(err)
@@ -237,6 +229,8 @@ func NewClientsCmd() *cobra.Command {
 	clientsCmd.AddCommand(clientsListCmd)
 	clientsCmd.AddCommand(clientsUpdateCmd)
 	clientsCmd.AddCommand(clientsDeleteCmd)
+
+	clientsCmd.PersistentFlags().StringVar(&dbPath, "db", "./db/luau.db", "The DB path")
 
 	return clientsCmd
 }

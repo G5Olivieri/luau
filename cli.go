@@ -10,5 +10,6 @@ func main() {
 	rootCmd := &cobra.Command{Use: "app"}
 	rootCmd.AddCommand(cmd.NewDbCmd())
 	rootCmd.AddCommand(cmd.NewClientsCmd())
+	rootCmd.AddCommand(cmd.NewAccountsCmd())
 	rootCmd.Execute()
 }

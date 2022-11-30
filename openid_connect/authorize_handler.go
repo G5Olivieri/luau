@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gmctechsols/luau/openid_connect/clients"
@@ -41,7 +42,10 @@ func AuthorizeHandler(c *gin.Context) {
 	mac.Write([]byte(csrf))
 	csrfMac := base64.URLEncoding.EncodeToString(mac.Sum(nil))
 
-	c.SetCookie("csrf", csrfMac, 900, "/", "localhost", true, true)
+	c.SetSameSite(http.SameSiteStrictMode)
+
+	c.SetCookie("csrf", csrfMac, 900, "/", os.Getenv("HOST"), false, true)
+
 	c.HTML(http.StatusOK, "index.tmpl", gin.H{
 		"csrf":         csrf,
 		"clientID":     request.ClientID,

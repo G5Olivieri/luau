@@ -3,14 +3,19 @@ package openidconnect
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
+	"database/sql"
 	"encoding/base64"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gmctechsols/luau/openid_connect/clients"
 	"github.com/golang-jwt/jwt/v4"
+	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/argon2"
 )
 
 type SigninRequest struct {
@@ -23,10 +28,33 @@ type SigninRequest struct {
 	State                    string `form:"state"`
 }
 
-// TODO: validate from database
-// TODO: hash password
-func authenticate(username, password string) bool {
-	return username == "Glayson" && password == "Murollo"
+var dbPath = os.Getenv("DATABASE_URL")
+
+func authenticate(username, password string) (bool, error) {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+
+	var (
+		dbPassword, dbSalt string
+	)
+	err = db.QueryRow("SELECT password, salt FROM accounts WHERE username=?;", username).Scan(&dbPassword, &dbSalt)
+	if err != nil {
+		return false, err
+	}
+
+	salt, err := base64.StdEncoding.DecodeString(dbSalt)
+	if err != nil {
+		return false, err
+	}
+	pwdBytes, err := base64.StdEncoding.DecodeString(dbPassword)
+	if err != nil {
+		return false, err
+	}
+	providedPwd := argon2.IDKey([]byte(password), salt, 2, 15*1024, 1, 32)
+	return subtle.ConstantTimeCompare(providedPwd, pwdBytes) == 1, nil
 }
 
 func SiginHandler(c *gin.Context) {
@@ -69,14 +97,19 @@ func SiginHandler(c *gin.Context) {
 		return
 	}
 
-	if !authenticate(request.Username, request.Password) {
+	authenticated, err := authenticate(request.Username, request.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !authenticated {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		// TODO: fetch from database
-		"sub": "Glayson",
+		"sub": request.Username,
 		"aud": request.ClientID,
 		"exp": time.Now().Add(5 * time.Second).Unix(),
 	})

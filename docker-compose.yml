@@ -5,9 +5,11 @@ services:
     build: .
     command: go run main.go
     environment:
+      HOST: localhost:8080
       EXPIRES_IN: 1800
-      ISSUER: https://luau.com
+      ISSUER: http://luau.com
       SECRET: obtLtyy1PTEcDL33ItvjhXwiiEjzERSaNDKmmnhuk2JdsSXR8nH7Dq75NbCqRZKB8TR7Fqth
+      DATABASE_URL: db/luau.db
     ports:
       - 8080:8080
     working_dir: /app

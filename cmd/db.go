@@ -9,17 +9,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func removeDB() {
-	log.Println("Removing file ./db/clients.db")
-	os.Remove("./db/clients.db")
+func removeDB(dbPath string) {
+	log.Printf("Removing file %s\n", dbPath)
+	os.Remove(dbPath)
 }
 
-func createDB() {
-	log.Println("Opening file ./db/clients.db")
-	db, err := sql.Open("sqlite3", "./db/clients.db")
+func createDB(dbPath string) {
+	log.Printf("Opening file %s\n", dbPath)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer db.Close()
 	sql := `
     CREATE TABLE IF NOT EXISTS clients(
       id TEXT PRIMARY KEY,
@@ -31,32 +32,36 @@ func createDB() {
       id TEXT PRIMARY KEY,
       username TEXT,
       password TEXT,
+      salt TEXT
     );
   `
-	log.Println("Creating clients table")
+	log.Println("Creating tables")
 	_, err = db.Exec(sql)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Closing file ./db/clients.db")
-	db.Close()
 }
 
 func NewDbCmd() *cobra.Command {
+	var dbPath string
+
 	dbDeleteCmd := &cobra.Command{
 		Use: "delete",
 		Run: func(cmd *cobra.Command, args []string) {
-			removeDB()
+			removeDB(dbPath)
 		},
 	}
 	dbCreateCmd := &cobra.Command{
 		Use: "create",
 		Run: func(cmd *cobra.Command, args []string) {
-			createDB()
+			createDB(dbPath)
 		},
 	}
 	dbCmd := &cobra.Command{Use: "db"}
 	dbCmd.AddCommand(dbDeleteCmd)
 	dbCmd.AddCommand(dbCreateCmd)
+
+	dbCmd.PersistentFlags().StringVar(&dbPath, "db", "./db/luau.db", "The DB path")
+
 	return dbCmd
 }
