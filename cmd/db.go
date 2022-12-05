@@ -34,6 +34,12 @@ func createDB(dbPath string) {
       password TEXT,
       salt TEXT
     );
+    CREATE TABLE IF NOT EXISTS sessions(
+      id TEXT PRIMARY KEY,
+      client TEXT,
+      username TEXT,
+      created_at INTEGER
+    );
   `
 	log.Println("Creating tables")
 	_, err = db.Exec(sql)

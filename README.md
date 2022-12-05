@@ -60,6 +60,8 @@ redirect_uri=
 - Stateless HMAC256 JWT
   - key is client_secret
 
+- Register all of new sessions creation
+
 ## Sign out
 
 - Delete JWT locally

@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gmctechsols/luau/openid_connect/clients"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/argon2"
 )
@@ -29,6 +30,27 @@ type SigninRequest struct {
 }
 
 var dbPath = os.Getenv("DATABASE_URL")
+
+func registerSession(client clients.Client, username string) error {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("INSERT INTO sessions(id, client, username, created_at) VALUES(?,?,?,?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(uuid.New().String(), client.ID.String(), username, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func authenticate(username, password string) (bool, error) {
 	db, err := sql.Open("sqlite3", dbPath)
@@ -124,5 +146,12 @@ func SiginHandler(c *gin.Context) {
 	q, _ := url.ParseQuery(uri.RawQuery)
 	q.Add("code", tokenString)
 	uri.RawQuery = q.Encode()
+
+	err = registerSession(client, request.Username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.Redirect(http.StatusFound, uri.String())
 }
