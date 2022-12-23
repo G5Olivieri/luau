@@ -6,6 +6,7 @@
 
 - golang 1.19
   - go-gin
+- SQLite3
 
 ## Client Registration
 
@@ -21,8 +22,15 @@ $ ./bin/luauctl clients create [NAME] [REDIRECT_URI]
 
 ## Sign up
 
-- Hardcoded
-  - `openidconnect/authenticate.go`
+- via CLI CTL
+
+Example:
+
+```bash
+$ go build -o ./bin/luauctl cli.go
+$ ./bin/luauctl db create
+$ ./bin/luauctl accounts create -u <username> -p <password>
+```
 
 ## Sign in
 
