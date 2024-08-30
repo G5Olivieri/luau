@@ -1,0 +1,24 @@
+<!DOCTYPE>
+<html lang="en">
+	<head>
+		<title>Authorize</title>
+	</head>
+	<body>
+		<form action="/oidc/login" method="POST">
+			<input type="hidden" name="client_id" value="{{.ClientID}}">
+			<input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
+			<input type="hidden" name="response_type" value="{{.ResponseType}}">
+			<input type="hidden" name="state" value="{{.State}}">
+			<input type="hidden" name="scope" value="{{.Scope}}">
+			<div>
+				<label for="username-input">username</label>
+				<input type="text" name="username" id="username-input" />
+			</div>
+			<div>
+				<label for="password-input">Password</label>
+				<input type="password" name="password" id="password-input" />
+			</div>
+			<button type="submit">submit</button>
+		</form>
+	</body>
+</html>
