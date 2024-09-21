@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
 	"github.com/G5Olivieri/luau/internal/csrf"
@@ -21,13 +20,15 @@ type AuthorizePage struct {
 	ResponseType string
 	State        string
 	Scope        string
+	CSRFToken    string
 }
 
 type AuthHandlerCSRFCookie struct {
-	Name      string
-	Secure    bool
-	HttpOnly  bool
-	ExpiresIn time.Duration
+	Name     string
+	Secure   bool
+	HttpOnly bool
+	MaxAge   int
+	SameSite http.SameSite
 }
 
 type AuthHandlerCSRF struct {
@@ -43,43 +44,60 @@ type AuthHandler struct {
 
 func NewAuthHandler(
 	clientRepository client.ClientRepository,
-	csrfTokenGenerator csrf.Generator,
-	csrfCookieName string,
-	csrfExpiresIn time.Duration,
+	csrfConfig AuthHandlerCSRF,
 	tmpl template.Template,
 ) AuthHandler {
 	return AuthHandler{
-		clientRepository:   clientRepository,
-		csrfTokenGenerator: csrfTokenGenerator,
-		csrfCookieName:     csrfCookieName,
-		csrfExpiresIn:      csrfExpiresIn,
-		tmpl:               tmpl,
+		clientRepository: clientRepository,
+		csrf: AuthHandlerCSRF{
+			TokenGenerator: csrfConfig.TokenGenerator,
+			Cookie: AuthHandlerCSRFCookie{
+				Name:     csrfConfig.Cookie.Name,
+				MaxAge:   csrfConfig.Cookie.MaxAge,
+				Secure:   csrfConfig.Cookie.Secure,
+				HttpOnly: csrfConfig.Cookie.HttpOnly,
+				SameSite: csrfConfig.Cookie.SameSite,
+			},
+		},
+		tmpl: tmpl,
 	}
 }
 
+// TODO: response_mode, nonce, display, prompt, max_age, ui_locales, id_token_hint, login_hint, acr_values
 func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	rawRedirectURI := r.URL.Query().Get("redirect_uri")
-	clientID := r.URL.Query().Get("client_id")
-
-	if clientID == "" {
-		body := []byte("client_id is REQUIRED")
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Header().Add("content-type", "text/plain")
-		w.Header().Add("content-lenght", strconv.Itoa(len(body)))
-		w.Write(body)
-		return
+	if r.Method == http.MethodPost {
+		if r.Header.Get("content-type") != "application/x-www-form-urlencoded" {
+			body := []byte("Content-Type is invalid")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Add("content-type", "text/plain")
+			w.Header().Add("content-length", strconv.Itoa(len(body)))
+			w.Write(body)
+			return
+		}
 	}
-
-	if rawRedirectURI == "" {
+	err := r.ParseForm()
+	if err != nil {
+		body := []byte("cannot parse params")
 		w.WriteHeader(http.StatusBadRequest)
-		body := []byte("redirect_uri is REQUIRED")
-		w.Header().Set("content-type", "text/plain")
-		w.Header().Set("content-length", strconv.Itoa(len(body)))
+		w.Header().Add("content-type", "text/plain")
+		w.Header().Add("content-length", strconv.Itoa(len(body)))
 		w.Write(body)
 		return
 	}
 
-	redirectURI, err := url.Parse(r.URL.Query().Get("redirect_uri"))
+	clientID, ok := getRequiredParam(w, r, "client_id")
+
+	if !ok {
+		return
+	}
+
+	rawRedirectURI, ok := getRequiredParam(w, r, "redirect_uri")
+
+	if !ok {
+		return
+	}
+
+	redirectURI, err := url.Parse(rawRedirectURI)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		body := []byte("malformed redirect_uri")
@@ -109,17 +127,19 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 
 	q := redirectURI.Query()
-	state := r.URL.Query().Get("state")
+	state, ok := getParamWithRedirect(w, r, "state", *redirectURI, q)
+
+	if !ok {
+		return
+	}
+
 	if state != "" {
 		q.Set("state", state)
 	}
 
-	responseType := r.URL.Query().Get("response_type")
-	if responseType == "" {
-		q.Set("error", "invalid_request")
-		q.Set("error_description", "response_type is REQUIRED")
-		redirectURI.RawQuery = q.Encode()
-		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
+	responseType, ok := getRequiredParamWithRedirect(w, r, "response_type", *redirectURI, q)
+
+	if !ok {
 		return
 	}
 
@@ -132,17 +152,22 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		return
 	}
 
-	scope := r.URL.Query().Get("scope")
+	scope, ok := getRequiredParamWithRedirect(w, r, "scope", *redirectURI, q)
+
+	if !ok {
+		return
+	}
+
 	if !strings.Contains(scope, "openid") {
 		log.Printf("invalid_scope '%s'\n", scope)
 		q.Set("error", "invalid_scope")
-		q.Set("error_description", "scope must be contain openid")
+		q.Set("error_description", "scope MUST contain openid")
 		redirectURI.RawQuery = q.Encode()
 		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
 		return
 	}
 
-	csrf, err := h.csrf.TokenGenerator.Generate()
+	csrfToken, err := h.csrf.TokenGenerator.Generate()
 	if err != nil {
 		log.Println(err.Error())
 		q.Set("error", "server_error")
@@ -154,19 +179,23 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 
 	csrfCookie := http.Cookie{
 		Name:     h.csrf.Cookie.Name,
-		Value:    csrf,
-		Expires:  time.Now().Add(h.csrf.Cookie.ExpiresIn),
+		Value:    csrfToken,
+		MaxAge:   h.csrf.Cookie.MaxAge,
 		HttpOnly: true,
 		Secure:   true,
 	}
 	http.SetCookie(w, &csrfCookie)
 
 	w.Header().Add("content-type", "text/html")
+
+	// TODO: create a session
+
 	h.tmpl.Execute(w, AuthorizePage{
 		ClientID:     clientID,
 		RedirectURI:  redirectURI.String(),
 		ResponseType: responseType,
 		State:        state,
 		Scope:        scope,
+		CSRFToken:    csrfToken,
 	})
 }

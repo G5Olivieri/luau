@@ -35,7 +35,7 @@ func (g HMACGenerator) Generate() (string, error) {
 	randomValueMAC := mac.Sum(nil)
 	randomValueMACBase64 := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(randomValueMAC)
 	randomValueBase64 := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(randomValue)
-	// TODO: add exp, maybe a JWT
+	// TODO: add session_id https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#pseudo-code-for-implementing-hmac-csrf-tokens
 	return randomValueMACBase64 + "." + randomValueBase64, nil
 }
 
@@ -56,12 +56,7 @@ func (g HMACGenerator) Validate(csrfToken string) (bool, error) {
 		return false, err
 	}
 
-	if !validateMAC([]byte(csrfTokenMessage), []byte(csrfTokenMAC), g.secret) {
-		return false, nil
-	}
-
-	// TODO: verify expiration
-	return true, nil
+	return validateMAC([]byte(csrfTokenMessage), []byte(csrfTokenMAC), g.secret), nil
 }
 
 func validateMAC(message, messageMAC, secret []byte) bool {

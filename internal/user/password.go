@@ -11,7 +11,8 @@ type Password struct {
 }
 
 func NewPassword(password []byte, hasher PasswordHasher) (Password, error) {
-	salt := make([]byte, 32)
+	// https://en.wikipedia.org/wiki/Argon2
+	salt := make([]byte, 16)
 	_, err := rand.Read(salt)
 	if err != nil {
 		return Password{}, err

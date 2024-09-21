@@ -21,14 +21,17 @@ func (r InMemoryUserRepository) GetByUsername(ctx context.Context, username stri
 			return u, nil
 		}
 	}
-	return EmptyUser(), fmt.Errorf("Client not found")
+	return EmptyUser(), fmt.Errorf("User not found")
 }
 
 func (r InMemoryUserRepository) GetByID(ctx context.Context, id string) (User, error) {
+	if id == "" {
+		return EmptyUser(), fmt.Errorf("ID is missing")
+	}
 	for _, u := range r.users {
 		if u.ID == id {
 			return u, nil
 		}
 	}
-	return EmptyUser(), fmt.Errorf("Client not found")
+	return EmptyUser(), fmt.Errorf("UserID(%s) not found", id)
 }
