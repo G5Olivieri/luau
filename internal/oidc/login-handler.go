@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
-	"github.com/G5Olivieri/luau/internal/csrf"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/julienschmidt/httprouter"
 )
@@ -22,24 +21,18 @@ type AuthorizationCode struct {
 type LoginHandler struct {
 	clientRepository         client.ClientRepository
 	userRepository           user.UserRepository
-	csrfGenerator            csrf.Generator
 	authorizationCodeEncoder AuthorizationCodeEncoder
-	csrfCookieName           string
 }
 
 func NewLoginHandler(
 	clientRepository client.ClientRepository,
 	userRepository user.UserRepository,
-	csrfGenerator csrf.Generator,
 	authorizationCodeEncoder AuthorizationCodeEncoder,
-	csrfCookieName string,
 ) LoginHandler {
 	return LoginHandler{
 		clientRepository:         clientRepository,
 		userRepository:           userRepository,
-		csrfGenerator:            csrfGenerator,
 		authorizationCodeEncoder: authorizationCodeEncoder,
-		csrfCookieName:           csrfCookieName,
 	}
 }
 func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -50,33 +43,7 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	csrfTokenCookie, err := r.Cookie(h.csrfCookieName)
-	if err != nil {
-		log.Println(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	valid, err := h.csrfGenerator.Validate(csrfTokenCookie.Value)
-	if err != nil {
-		log.Println("CSRF Token Validate failure")
-		log.Println(err.Error())
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	if !valid {
-		log.Println("Invalid CSRF Token")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	csrfFormToken := r.PostForm.Get("csrf_token")
-	if csrfFormToken != csrfTokenCookie.Value {
-		log.Println("CSRF Token cookie and form is not the same")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	// TODO: mitigate csrf
 
 	rawRedirectURI := r.Form.Get("redirect_uri")
 	if rawRedirectURI == "" {
@@ -197,6 +164,8 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	// TODO: save in session
 
 	q.Set("code", code)
 	redirectURI.RawQuery = q.Encode()

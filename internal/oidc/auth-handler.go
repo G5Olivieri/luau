@@ -10,7 +10,6 @@ import (
 	"text/template"
 
 	"github.com/G5Olivieri/luau/internal/client"
-	"github.com/G5Olivieri/luau/internal/csrf"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -20,94 +19,40 @@ type AuthorizePage struct {
 	ResponseType string
 	State        string
 	Scope        string
-	CSRFToken    string
-}
-
-type AuthHandlerCSRFCookie struct {
-	Name     string
-	Secure   bool
-	HttpOnly bool
-	MaxAge   int
-	SameSite http.SameSite
-}
-
-type AuthHandlerCSRF struct {
-	TokenGenerator csrf.Generator
-	Cookie         AuthHandlerCSRFCookie
 }
 
 type AuthHandler struct {
 	clientRepository client.ClientRepository
-	csrf             AuthHandlerCSRF
 	tmpl             template.Template
 }
 
 func NewAuthHandler(
 	clientRepository client.ClientRepository,
-	csrfConfig AuthHandlerCSRF,
 	tmpl template.Template,
 ) AuthHandler {
 	return AuthHandler{
 		clientRepository: clientRepository,
-		csrf: AuthHandlerCSRF{
-			TokenGenerator: csrfConfig.TokenGenerator,
-			Cookie: AuthHandlerCSRFCookie{
-				Name:     csrfConfig.Cookie.Name,
-				MaxAge:   csrfConfig.Cookie.MaxAge,
-				Secure:   csrfConfig.Cookie.Secure,
-				HttpOnly: csrfConfig.Cookie.HttpOnly,
-				SameSite: csrfConfig.Cookie.SameSite,
-			},
-		},
-		tmpl: tmpl,
+		tmpl:             tmpl,
 	}
+}
+
+type AuthRequest struct {
+	ClientID     string
+	RedirectURI  string
+	State        string
+	ResponseType string
+	Scope        string
 }
 
 // TODO: response_mode, nonce, display, prompt, max_age, ui_locales, id_token_hint, login_hint, acr_values
 func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	if r.Method == http.MethodPost {
-		if r.Header.Get("content-type") != "application/x-www-form-urlencoded" {
-			body := []byte("Content-Type is invalid")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Header().Add("content-type", "text/plain")
-			w.Header().Add("content-length", strconv.Itoa(len(body)))
-			w.Write(body)
-			return
-		}
-	}
-	err := r.ParseForm()
-	if err != nil {
-		body := []byte("cannot parse params")
-		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Add("content-type", "text/plain")
-		w.Header().Add("content-length", strconv.Itoa(len(body)))
-		w.Write(body)
-		return
-	}
-
-	clientID, ok := getRequiredParam(w, r, "client_id")
+	data, ok := h.parseAuthRequest(w, r)
 
 	if !ok {
 		return
 	}
 
-	rawRedirectURI, ok := getRequiredParam(w, r, "redirect_uri")
-
-	if !ok {
-		return
-	}
-
-	redirectURI, err := url.Parse(rawRedirectURI)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		body := []byte("malformed redirect_uri")
-		w.Header().Set("content-type", "text/plain")
-		w.Header().Set("content-length", strconv.Itoa(len(body)))
-		w.Write(body)
-		return
-	}
-
-	c, err := h.clientRepository.GetByID(r.Context(), clientID)
+	c, err := h.clientRepository.GetByID(r.Context(), data.ClientID)
 	if errors.Is(err, client.NotFoundErr) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -120,17 +65,73 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		return
 	}
 
-	if c.RawRedirectURI != rawRedirectURI {
+	if c.RawRedirectURI != data.RedirectURI {
 		log.Println("provided redirect uri is not registered redirect uri")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
+	}
+
+	// TODO: mitigate CSRF
+	// TODO: create a session
+
+	w.Header().Add("content-type", "text/html")
+	h.tmpl.Execute(w, AuthorizePage{
+		ClientID:     data.ClientID,
+		RedirectURI:  data.RedirectURI,
+		ResponseType: data.ResponseType,
+		State:        data.State,
+		Scope:        data.Scope,
+	})
+}
+
+func (h AuthHandler) parseAuthRequest(w http.ResponseWriter, r *http.Request) (AuthRequest, bool) {
+	if r.Method == http.MethodPost {
+		if r.Header.Get("content-type") != "application/x-www-form-urlencoded" {
+			body := []byte("Content-Type is invalid")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Add("content-type", "text/plain")
+			w.Header().Add("content-length", strconv.Itoa(len(body)))
+			w.Write(body)
+			return AuthRequest{}, false
+		}
+	}
+	err := r.ParseForm()
+	if err != nil {
+		body := []byte("cannot parse params")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Add("content-type", "text/plain")
+		w.Header().Add("content-length", strconv.Itoa(len(body)))
+		w.Write(body)
+		return AuthRequest{}, false
+	}
+
+	clientID, ok := getRequiredParam(w, r, "client_id")
+
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	rawRedirectURI, ok := getRequiredParam(w, r, "redirect_uri")
+
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	redirectURI, err := url.Parse(rawRedirectURI)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		body := []byte("malformed redirect_uri")
+		w.Header().Set("content-type", "text/plain")
+		w.Header().Set("content-length", strconv.Itoa(len(body)))
+		w.Write(body)
+		return AuthRequest{}, false
 	}
 
 	q := redirectURI.Query()
 	state, ok := getParamWithRedirect(w, r, "state", *redirectURI, q)
 
 	if !ok {
-		return
+		return AuthRequest{}, false
 	}
 
 	if state != "" {
@@ -140,7 +141,7 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 	responseType, ok := getRequiredParamWithRedirect(w, r, "response_type", *redirectURI, q)
 
 	if !ok {
-		return
+		return AuthRequest{}, false
 	}
 
 	if responseType != "code" {
@@ -149,13 +150,13 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		q.Set("error_description", "supported response_type is code")
 		redirectURI.RawQuery = q.Encode()
 		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
-		return
+		return AuthRequest{}, false
 	}
 
 	scope, ok := getRequiredParamWithRedirect(w, r, "scope", *redirectURI, q)
 
 	if !ok {
-		return
+		return AuthRequest{}, false
 	}
 
 	if !strings.Contains(scope, "openid") {
@@ -164,38 +165,14 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		q.Set("error_description", "scope MUST contain openid")
 		redirectURI.RawQuery = q.Encode()
 		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
-		return
+		return AuthRequest{}, false
 	}
 
-	csrfToken, err := h.csrf.TokenGenerator.Generate()
-	if err != nil {
-		log.Println(err.Error())
-		q.Set("error", "server_error")
-		q.Set("error_description", "internal server error")
-		redirectURI.RawQuery = q.Encode()
-		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
-		return
-	}
-
-	csrfCookie := http.Cookie{
-		Name:     h.csrf.Cookie.Name,
-		Value:    csrfToken,
-		MaxAge:   h.csrf.Cookie.MaxAge,
-		HttpOnly: true,
-		Secure:   true,
-	}
-	http.SetCookie(w, &csrfCookie)
-
-	w.Header().Add("content-type", "text/html")
-
-	// TODO: create a session
-
-	h.tmpl.Execute(w, AuthorizePage{
+	return AuthRequest{
 		ClientID:     clientID,
-		RedirectURI:  redirectURI.String(),
-		ResponseType: responseType,
+		RedirectURI:  rawRedirectURI,
 		State:        state,
+		ResponseType: responseType,
 		Scope:        scope,
-		CSRFToken:    csrfToken,
-	})
+	}, true
 }

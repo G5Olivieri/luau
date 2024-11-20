@@ -10,20 +10,11 @@ import (
 	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
+	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/julienschmidt/httprouter"
 )
-
-type IDToken struct {
-	AuthTime *uint64 `json:"auth_time",omitempty`
-	Nonce    *string `json:"nonce",omitempty`
-	Acr      *string `json:"acr",omitempty`
-	Amr      *string `json:"amr",omitempty`
-	Azp      *string `json:"azp",omitempty`
-	AtHash   *string `json:"at_hash",omitempty`
-	jwt.RegisteredClaims
-}
 
 type TokenHandlerResponse struct {
 	AccessToken  string `json:"access_token"`
@@ -32,12 +23,14 @@ type TokenHandlerResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	IDToken      string `json:"id_token"`
 }
+
 type TokenHandler struct {
 	clientRepository         client.ClientRepository
 	authorizationCodeEncoder AuthorizationCodeEncoder
 	userRepository           user.UserRepository
 	idTokenJWTEncoder        IDTokenJWTEncoder
 	expiration               uint32
+	internalJWT              luaujwt.JWTEncoder
 }
 
 func NewTokenHandler(
@@ -46,6 +39,7 @@ func NewTokenHandler(
 	idTokenJWTEncoder IDTokenJWTEncoder,
 	userRepository user.UserRepository,
 	expiration uint32,
+	internalJWT luaujwt.JWTEncoder,
 ) TokenHandler {
 	return TokenHandler{
 		clientRepository:         clientRepository,
@@ -53,6 +47,7 @@ func NewTokenHandler(
 		userRepository:           userRepository,
 		idTokenJWTEncoder:        idTokenJWTEncoder,
 		expiration:               expiration,
+		internalJWT:              internalJWT,
 	}
 }
 
@@ -139,23 +134,46 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 
 	now := time.Now()
 	idToken, err := h.idTokenJWTEncoder.Encode(jwt.RegisteredClaims{
+		// TODO: idTokenJWTEncoder MUST add some claims
 		Issuer:    "https://luau.com",
-		Subject:   user.ID,
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(h.expiration) * time.Second)),
+		Subject:   user.ID,
 		Audience:  jwt.ClaimStrings{client.ID},
 	})
+
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// TODO:: generate AccessToken, TokenType, ExpiresIn, RefreshToken
+
+	// TODO: generate AccessToken, TokenType, ExpiresIn, RefreshToken
+	accessToken, err := h.internalJWT.EncodeCompact(luaujwt.RegisteredClaims{
+		Sub: user.Username,
+		Exp: time.Now().Add(time.Duration(h.expiration * uint32(time.Second))).Unix(),
+	})
+	if err != nil {
+		log.Println("AccessToken error")
+		w.WriteHeader(500)
+		return
+	}
+
+	refreshToken, err := h.internalJWT.EncodeCompact(luaujwt.RegisteredClaims{
+		Sub: user.Username,
+		Exp: time.Now().Add(time.Duration(5 * time.Hour)).Unix(),
+	})
+	if err != nil {
+		log.Println("RefreshToken error")
+		w.WriteHeader(500)
+		return
+	}
+
 	response := TokenHandlerResponse{
 		TokenType:    "Bearer",
-		ExpiresIn:    3 * 3600,
-		AccessToken:  "kfjlsa",
-		RefreshToken: "kfjlsa",
+		ExpiresIn:    h.expiration,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 		IDToken:      idToken,
 	}
 	jsonResponse, err := json.Marshal(response)

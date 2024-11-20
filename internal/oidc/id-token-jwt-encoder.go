@@ -4,6 +4,16 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type IDToken struct {
+	AuthTime *uint64 `json:"auth_time",omitempty`
+	Nonce    *string `json:"nonce",omitempty`
+	Acr      *string `json:"acr",omitempty`
+	Amr      *string `json:"amr",omitempty`
+	Azp      *string `json:"azp",omitempty`
+	AtHash   *string `json:"at_hash",omitempty`
+	jwt.RegisteredClaims
+}
+
 type IDTokenJWTEncoder interface {
 	Encode(claims jwt.Claims) (string, error)
 	Decode(jwtString string) (*jwt.Token, error)

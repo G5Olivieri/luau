@@ -8,7 +8,7 @@ import (
 	"text/template"
 
 	"github.com/G5Olivieri/luau/internal/client"
-	"github.com/G5Olivieri/luau/internal/csrf"
+	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
 	"github.com/G5Olivieri/luau/internal/oidc"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/golang-jwt/jwt/v5"
@@ -80,9 +80,6 @@ func main() {
 		{ID: "glayssinho", RawRedirectURI: "http://localhost:3000/callback"},
 	})
 
-	csrfTokenGenerator := csrf.NewHMACGenerator(csrfSecret)
-	csrfCookieName := "csrf_token"
-	csrfMaxAge := 3600
 	authorizationCodeEncoder := oidc.NewJWTAuthorizationCodeEncoder(jwt.SigningMethodHS256, func(_ *jwt.Token) (interface{}, error) {
 		return codeSecretKey, nil
 	})
@@ -99,18 +96,30 @@ func main() {
 		return &idTokenPrivateKey.PublicKey, nil
 	})
 
-	authHandler := oidc.NewAuthHandler(clientRepository, oidc.AuthHandlerCSRF{
-		TokenGenerator: csrfTokenGenerator,
-		Cookie: oidc.AuthHandlerCSRFCookie{
-			Name:     csrfCookieName,
-			MaxAge:   csrfMaxAge,
-			Secure:   true,
-			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
-		},
-	}, *tmpl)
-	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, csrfTokenGenerator, authorizationCodeEncoder, csrfCookieName)
-	tokenHandler := oidc.NewTokenHandler(clientRepository, authorizationCodeEncoder, idTokenJWTEncoder, userRepository, 3*3600)
+	// internaljwtSecret := make([]byte, 32)
+	// _, err = rand.Read(internaljwtSecret)
+	// if err != nil {
+	// 	log.Println("Genereate key")
+	// 	log.Fatalln(err.Error())
+	// }
+	// internaljwt := luaujwt.NewJWTHMAC256(internaljwtSecret)
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Println("GenerateKey")
+		log.Fatalln(err.Error())
+		return
+	}
+	internaljwt := luaujwt.NewJWTPSS256(rsaKey)
+	jwk, err := luaujwt.EncodeRSAPublicKey(rsaKey, "Name", "1", "PS256")
+	if err != nil {
+		log.Println("EncodeRSAPublicKey error")
+		log.Fatal(err.Error())
+	}
+	log.Println(jwk)
+	authHandler := oidc.NewAuthHandler(clientRepository, *tmpl)
+	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, authorizationCodeEncoder)
+	tokenHandler := oidc.NewTokenHandler(clientRepository, authorizationCodeEncoder, idTokenJWTEncoder, userRepository, 3*3600, internaljwt)
 
 	r := httprouter.New()
 	// Authentication Request MUST support the use of the HTTP GET and POST
@@ -119,6 +128,9 @@ func main() {
 
 	r.POST("/oidc/token", NoCacheHandler(tokenHandler.Handle))
 	r.POST("/oidc/login", NoCacheHandler(loginHandler.Handle))
-	log.Println("Listining :8080")
-	http.ListenAndServe(":8080", r)
+
+	// r.GET("/oidc/.well-known/jwks.json", ())
+
+	log.Println("Listening :8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
