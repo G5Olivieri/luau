@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -9,7 +10,10 @@ import (
 	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/csrf"
+	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -22,17 +26,23 @@ type LoginHandler struct {
 	clientRepository         client.ClientRepository
 	userRepository           user.UserRepository
 	authorizationCodeEncoder AuthorizationCodeEncoder
+	csrfTokenGenerator       csrf.Generator
+	sessionStore             session.SessionStore
 }
 
 func NewLoginHandler(
 	clientRepository client.ClientRepository,
 	userRepository user.UserRepository,
 	authorizationCodeEncoder AuthorizationCodeEncoder,
+	csrfTokenGenerator csrf.Generator,
+	sessionStore session.SessionStore,
 ) LoginHandler {
 	return LoginHandler{
 		clientRepository:         clientRepository,
 		userRepository:           userRepository,
 		authorizationCodeEncoder: authorizationCodeEncoder,
+		csrfTokenGenerator:       csrfTokenGenerator,
+		sessionStore:             sessionStore,
 	}
 }
 func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -43,7 +53,28 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	// TODO: mitigate csrf
+	csrfToken := r.FormValue("csrf")
+	cookieCsrfToken, err := r.Cookie("csrf")
+
+	if err != nil {
+		log.Println(err.Error())
+		http.Error(w, "Invalid CSRF token", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("csrfToken %s, cookie %s\n", csrfToken, cookieCsrfToken.Value)
+
+	valid, err := h.csrfTokenGenerator.Validate(csrfToken, cookieCsrfToken.Value)
+	if err != nil {
+		log.Println(err.Error())
+		http.Error(w, "Invalid CSRF token", http.StatusBadRequest)
+		return
+	}
+
+	if !valid {
+		http.Error(w, "Invalid CSRF token", http.StatusBadRequest)
+		return
+	}
 
 	rawRedirectURI := r.Form.Get("redirect_uri")
 	if rawRedirectURI == "" {
@@ -152,6 +183,40 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
+	sessionIDCookie, err := r.Cookie("session")
+	var sessionID string
+	var sessionValue *session.Session
+
+	if errors.Is(err, http.ErrNoCookie) {
+		log.Println(err.Error())
+		sessionID = uuid.NewString()
+	} else if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		sessionID = sessionIDCookie.Value
+		log.Printf("Cookie found '%s'\n", sessionID)
+		if sessionID == "" {
+			sessionID = uuid.NewString()
+		}
+	}
+
+	sessionValue, err = h.sessionStore.Get(r.Context(), sessionID)
+	if errors.Is(err, session.ErrNotFound) {
+		log.Println(err.Error())
+		sessionValue = &session.Session{
+			ID:   sessionID,
+			Data: make(map[string]interface{}),
+		}
+	} else if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	sessionValue.Data["userId"] = user.ID
+	h.sessionStore.Set(r.Context(), sessionValue)
+
 	code, err := h.authorizationCodeEncoder.Encode(AuthorizationCode{
 		UserID: user.ID,
 		// short-lived token, less than 10 minutes
@@ -164,9 +229,6 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	// TODO: save in session
-
 	q.Set("code", code)
 	redirectURI.RawQuery = q.Encode()
 	http.Redirect(w, r, redirectURI.String(), http.StatusFound)

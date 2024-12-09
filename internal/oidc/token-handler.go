@@ -12,7 +12,6 @@ import (
 	"github.com/G5Olivieri/luau/internal/client"
 	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
 	"github.com/G5Olivieri/luau/internal/user"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -29,7 +28,7 @@ type TokenHandler struct {
 	authorizationCodeEncoder AuthorizationCodeEncoder
 	userRepository           user.UserRepository
 	idTokenJWTEncoder        IDTokenJWTEncoder
-	expiration               uint32
+	expiration               int64
 	internalJWT              luaujwt.JWTEncoder
 }
 
@@ -38,7 +37,7 @@ func NewTokenHandler(
 	authorizationCodeEncoder AuthorizationCodeEncoder,
 	idTokenJWTEncoder IDTokenJWTEncoder,
 	userRepository user.UserRepository,
-	expiration uint32,
+	expiration int64,
 	internalJWT luaujwt.JWTEncoder,
 ) TokenHandler {
 	return TokenHandler{
@@ -133,25 +132,11 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 	}
 
 	now := time.Now()
-	idToken, err := h.idTokenJWTEncoder.Encode(jwt.RegisteredClaims{
-		// TODO: idTokenJWTEncoder MUST add some claims
-		Issuer:    "https://luau.com",
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(h.expiration) * time.Second)),
-		Subject:   user.ID,
-		Audience:  jwt.ClaimStrings{client.ID},
-	})
-
-	if err != nil {
-		log.Println(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	// TODO: generate AccessToken, TokenType, ExpiresIn, RefreshToken
 	accessToken, err := h.internalJWT.EncodeCompact(luaujwt.RegisteredClaims{
 		Sub: user.Username,
-		Exp: time.Now().Add(time.Duration(h.expiration * uint32(time.Second))).Unix(),
+		// TODO: get from config
+		Exp: now.Add(time.Duration(h.expiration) * time.Second).Unix(),
 	})
 	if err != nil {
 		log.Println("AccessToken error")
@@ -161,11 +146,27 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 
 	refreshToken, err := h.internalJWT.EncodeCompact(luaujwt.RegisteredClaims{
 		Sub: user.Username,
-		Exp: time.Now().Add(time.Duration(5 * time.Hour)).Unix(),
+		// TODO: get from config
+		Exp: now.Add(time.Duration(5 * time.Hour)).Unix(),
 	})
 	if err != nil {
 		log.Println("RefreshToken error")
 		w.WriteHeader(500)
+		return
+	}
+
+	idToken, err := h.idTokenJWTEncoder.Encode(IDToken{
+		Issuer:    "https://luau.com",
+		Subject:   user.ID,
+		IssuedAt:  now,
+		ExpiresAt: now.Add(time.Duration(h.expiration) * time.Second),
+		Audience:  []string{client.ID},
+		// TODO: AtHash
+	})
+
+	if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 

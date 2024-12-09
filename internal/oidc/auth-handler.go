@@ -8,8 +8,12 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/csrf"
+	"github.com/G5Olivieri/luau/internal/session"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -19,20 +23,30 @@ type AuthorizePage struct {
 	ResponseType string
 	State        string
 	Scope        string
+	CSRFToken    string
 }
 
 type AuthHandler struct {
-	clientRepository client.ClientRepository
-	tmpl             template.Template
+	clientRepository         client.ClientRepository
+	csrfTokenGenerator       csrf.Generator
+	sessionStore             session.SessionStore
+	authorizationCodeEncoder AuthorizationCodeEncoder
+	tmpl                     template.Template
 }
 
 func NewAuthHandler(
 	clientRepository client.ClientRepository,
+	csrfTokenGenerator csrf.Generator,
+	sessionStore session.SessionStore,
+	authorizationCodeEncoder AuthorizationCodeEncoder,
 	tmpl template.Template,
 ) AuthHandler {
 	return AuthHandler{
-		clientRepository: clientRepository,
-		tmpl:             tmpl,
+		clientRepository:         clientRepository,
+		csrfTokenGenerator:       csrfTokenGenerator,
+		sessionStore:             sessionStore,
+		authorizationCodeEncoder: authorizationCodeEncoder,
+		tmpl:                     tmpl,
 	}
 }
 
@@ -46,7 +60,7 @@ type AuthRequest struct {
 
 // TODO: response_mode, nonce, display, prompt, max_age, ui_locales, id_token_hint, login_hint, acr_values
 func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	data, ok := h.parseAuthRequest(w, r)
+	data, ok := h.parseAndValidateAuthRequest(w, r)
 
 	if !ok {
 		return
@@ -71,20 +85,110 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		return
 	}
 
-	// TODO: mitigate CSRF
+	sessionIDCookie, err := r.Cookie("session")
+	var sessionID string
+	var sessionValue *session.Session
+
+	if errors.Is(err, http.ErrNoCookie) {
+		log.Println(err.Error())
+		sessionID = uuid.NewString()
+	} else if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		sessionID = sessionIDCookie.Value
+		if sessionID == "" {
+			sessionID = uuid.NewString()
+		}
+	}
+
+	sessionValue, err = h.sessionStore.Get(r.Context(), sessionID)
+	if errors.Is(err, session.ErrNotFound) {
+		log.Println(err.Error())
+		sessionValue = &session.Session{
+			ID:   sessionID,
+			Data: make(map[string]interface{}),
+		}
+	} else if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if v, ok := sessionValue.Data["userId"]; ok {
+		userID, ok := v.(string)
+		if ok {
+			code, err := h.authorizationCodeEncoder.Encode(AuthorizationCode{
+				UserID: userID,
+				// short-lived token, less than 10 minutes
+				Exp: time.Now().Add(time.Duration(5) * time.Minute),
+			})
+
+			if err != nil {
+				log.Println(err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			redirectURI, err := url.Parse(data.RedirectURI)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				body := []byte("malformed redirect_uri")
+				w.Header().Set("content-type", "text/plain")
+				w.Header().Set("content-length", strconv.Itoa(len(body)))
+				w.Write(body)
+				return
+			}
+
+			q := redirectURI.Query()
+			state := r.Form.Get("state")
+			if state != "" {
+				q.Set("state", state)
+			}
+
+			q.Set("code", code)
+			redirectURI.RawQuery = q.Encode()
+			http.Redirect(w, r, redirectURI.String(), http.StatusFound)
+			return
+		}
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessionID,
+		HttpOnly: true,
+		Secure:   true,
+	})
+
+	h.sessionStore.Set(r.Context(), sessionValue)
+
+	csrfToken, cookieCsrfToken, err := h.csrfTokenGenerator.Generate()
+	if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	// TODO: create a session
+	// TODO: create csrf token using https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern
 
 	w.Header().Add("content-type", "text/html")
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf",
+		Value:    cookieCsrfToken,
+		HttpOnly: true,
+		Secure:   true,
+	})
 	h.tmpl.Execute(w, AuthorizePage{
 		ClientID:     data.ClientID,
 		RedirectURI:  data.RedirectURI,
 		ResponseType: data.ResponseType,
 		State:        data.State,
 		Scope:        data.Scope,
+		CSRFToken:    csrfToken,
 	})
 }
 
-func (h AuthHandler) parseAuthRequest(w http.ResponseWriter, r *http.Request) (AuthRequest, bool) {
+func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.Request) (AuthRequest, bool) {
 	if r.Method == http.MethodPost {
 		if r.Header.Get("content-type") != "application/x-www-form-urlencoded" {
 			body := []byte("Content-Type is invalid")

@@ -47,7 +47,7 @@ func (e JWTAuthorizationCodeEncoder) Decode(code string) (AuthorizationCode, err
 	claims, ok := token.Claims.(*AuthorizationCodeClaims)
 
 	if !ok {
-		return AuthorizationCode{}, fmt.Errorf("Cannot convert JWT Claims to AuthorizationCodeClaims")
+		return AuthorizationCode{}, fmt.Errorf("cannot convert jwt claims to authorization code claims")
 	}
 
 	return AuthorizationCode{

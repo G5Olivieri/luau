@@ -3,13 +3,16 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
 	"log"
 	"net/http"
 	"text/template"
 
 	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/csrf"
 	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
 	"github.com/G5Olivieri/luau/internal/oidc"
+	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -79,6 +82,7 @@ func main() {
 	clientRepository := client.NewInMemoryClientRepository([]client.Client{
 		{ID: "glayssinho", RawRedirectURI: "http://localhost:3000/callback"},
 	})
+	log.Println(base64.StdEncoding.EncodeToString(csrfSecret))
 
 	authorizationCodeEncoder := oidc.NewJWTAuthorizationCodeEncoder(jwt.SigningMethodHS256, func(_ *jwt.Token) (interface{}, error) {
 		return codeSecretKey, nil
@@ -111,14 +115,12 @@ func main() {
 		return
 	}
 	internaljwt := luaujwt.NewJWTPSS256(rsaKey)
-	jwk, err := luaujwt.EncodeRSAPublicKey(rsaKey, "Name", "1", "PS256")
-	if err != nil {
-		log.Println("EncodeRSAPublicKey error")
-		log.Fatal(err.Error())
-	}
-	log.Println(jwk)
-	authHandler := oidc.NewAuthHandler(clientRepository, *tmpl)
-	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, authorizationCodeEncoder)
+
+	csrfTokenGenerator := csrf.NewHMACGenerator(csrfSecret)
+	sessionStore := session.NewInMemorySessionStore(make(map[string]*session.Session))
+
+	authHandler := oidc.NewAuthHandler(clientRepository, csrfTokenGenerator, sessionStore, authorizationCodeEncoder, *tmpl)
+	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, authorizationCodeEncoder, csrfTokenGenerator, sessionStore)
 	tokenHandler := oidc.NewTokenHandler(clientRepository, authorizationCodeEncoder, idTokenJWTEncoder, userRepository, 3*3600, internaljwt)
 
 	r := httprouter.New()
