@@ -1,30 +1,24 @@
 package user
 
-import (
-	"crypto/rand"
-)
-
-type Password struct {
-	hash   []byte
-	salt   []byte
-	hasher PasswordHasher
+type Password interface {
+	Verify(password []byte) bool
 }
 
-func NewPassword(password []byte, hasher PasswordHasher) (Password, error) {
-	// https://en.wikipedia.org/wiki/Argon2
-	salt := make([]byte, 16)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return Password{}, err
-	}
+type HashSaltPassword struct {
+	hash   []byte
+	salt   []byte
+	hasher HashSaltPasswordHasher
+}
+
+func NewHashSaltPassword(password, salt []byte, hasher HashSaltPasswordHasher) (Password, error) {
 	hash := hasher.Hash(password, salt)
-	return Password{
+	return HashSaltPassword{
 		hash:   hash,
 		salt:   salt,
 		hasher: hasher,
 	}, nil
 }
 
-func (p Password) Verify(password []byte) bool {
+func (p HashSaltPassword) Verify(password []byte) bool {
 	return p.hasher.Verify([]byte(password), p.hash, p.salt)
 }

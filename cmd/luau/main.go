@@ -41,7 +41,7 @@ func main() {
 	codeSecretKey := make([]byte, 32)
 	_, err := rand.Read(codeSecretKey)
 	if err != nil {
-		log.Println("Erro generate codeSecretKey")
+		log.Println("Error generate codeSecretKey")
 		log.Fatalln(err.Error())
 		return
 	}
@@ -49,7 +49,7 @@ func main() {
 	csrfSecret := make([]byte, 32)
 	_, err = rand.Read(csrfSecret)
 	if err != nil {
-		log.Println("Erro generate csrfSecret")
+		log.Println("Error generate csrfSecret")
 		log.Fatalln(err.Error())
 		return
 	}
@@ -57,7 +57,16 @@ func main() {
 	jwtSecretKey := make([]byte, 32)
 	_, err = rand.Read(jwtSecretKey)
 	if err != nil {
-		log.Println("Erro generate csrfSecret")
+		log.Println("Error generate csrfSecret")
+		log.Fatalln(err.Error())
+		return
+	}
+
+	// https://en.wikipedia.org/wiki/Argon2
+	salt := make([]byte, 16)
+	_, err = rand.Read(salt)
+	if err != nil {
+		log.Println("generate password salt error")
 		log.Fatalln(err.Error())
 		return
 	}
@@ -65,7 +74,7 @@ func main() {
 	// https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
 	// The 32-sized ouput can be used as AES-256 key
 	hasher := user.NewArgon2PasswordHasher(1, 46*1024, 1, 32)
-	password, err := user.NewPassword([]byte("glayson"), hasher)
+	password, err := user.NewHashSaltPassword([]byte("glayson"), salt, hasher)
 	if err != nil {
 		log.Println("new password error")
 		log.Fatalln(err.Error())

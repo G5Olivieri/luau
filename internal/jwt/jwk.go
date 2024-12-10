@@ -24,8 +24,33 @@ type JWK struct {
 	X5tS256 *string  `json:"x5t#S256"`
 }
 
-func EncodeRSAPublicKey(rsaKey *rsa.PrivateKey, name, id, alg string) (string, error) {
+type KeyUsage []string
+
+type KeySpec struct {
+	Name  string
+	Usage KeyUsage
+}
+
+type Key[T interface{}] struct {
+	ID      string
+	KeySpec KeySpec
+	Value   T
+}
+
+type RSAPublicKeyHash string
+
+type RSAPublicKeySpec struct {
+	KeySpec
+	Hash      RSAPublicKeyHash
+	KeyLength int
+}
+
+type RSAPublicKey = Key[*rsa.PublicKey]
+
+func EncodeRSAPublicKey() (string, error) {
+
 	template := &x509.Certificate{
+		// TODO: I don't know how I should fill these fields. Study more!
 		SerialNumber: big.NewInt(12345),
 		Subject:      pkix.Name{CommonName: name},
 		NotBefore:    time.Now(),
