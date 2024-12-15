@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenID Connect Token Request",
+  "description": "Schema for validating parameters of an OpenID Connect token request",
+  "type": "object",
+  "properties": {
+    "code_verifier": {
+        "type": "string"
+    }
+  },
+  "required": ["code_verifier"]
+}

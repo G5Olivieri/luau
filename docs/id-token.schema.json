@@ -1,0 +1,72 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "OpenID Connect ID Token",
+    "description": "Schema for validating an OpenID Connect ID Token",
+    "type": "object",
+    "properties": {
+      "iss": {
+        "type": "string",
+        "format": "uri",
+        "description": "Issuer - The issuer of the ID Token. REQUIRED. Issuer Identifier for the Issuer of the response. The iss value is a case-sensitive URL using the https scheme that contains scheme, host, and optionally, port number and path components and no query or fragment components."
+      },
+      "sub": {
+        "type": "string",
+        "description": "Subject - The subject of the token, typically a user ID."
+      },
+      "aud": {
+        "oneOf": [
+          { "type": "string" },
+          { "type": "array", "items": { "type": "string" } }
+        ],
+        "description": "Audience - The intended recipient(s) of the ID Token."
+      },
+      "exp": {
+        "type": "integer",
+        "description": "Expiration Time - The time after which the token is no longer valid."
+      },
+      "nbf": {
+        "type": "integer",
+        "description": "Not Before - The time before which the token is not valid."
+      },
+      "iat": {
+        "type": "integer",
+        "description": "Issued At - The time at which the token was issued."
+      },
+      "auth_time": {
+        "type": "integer",
+        "description": "Authentication Time - The time at which the user was authenticated."
+      },
+      "acr": {
+        "type": "string",
+        "description": "Authentication Context Class Reference - A reference to an authentication context."
+      },
+      "amr": {
+        "oneOf": [
+          { "type": "string" },
+          { "type": "array", "items": { "type": "string" } }
+        ],
+        "description": "Authentication Methods References - The authentication methods used."
+      },
+      "azp": {
+        "type": "string",
+        "description": "Authorized Party - The client_id of the Relying Party that the ID Token was issued to."
+      },
+      "nonce": {
+        "type": "string",
+        "description": "Nonce - A value that is expected to be used only once."
+      },
+      "at_hash": {
+        "type": "string",
+        "description": "Access Token Hash - A hash of the access token issued."
+      },
+      "c_hash": {
+        "type": "string",
+        "description": "Code Hash - A hash of the authorization code issued."
+      },
+      "claims": {
+        "type": "object",
+        "description": "Additional claims - Additional information about the authenticated user."
+      }
+    },
+    "required": ["iss", "sub", "aud", "exp", "iat", "nonce"]
+  }

@@ -1,0 +1,42 @@
+flowchart TD
+    A{is required params provided?}
+    B{response_type is code?}
+    C{is client_id authorized?}
+    D{does scope contain openid?}
+    E{redirect_uri == client.redirect_uri?}
+    F{is display present?}
+    G{display == page?}
+
+    EA[error: invalid_request]
+    EB[error: unsupported_response_type]
+    EC[error: unauthorized_client]
+    ED[error: invalid_scope]
+    EE[error: access_denied]
+
+
+    A --> |no| EA
+    A -->|yes| B
+
+    B -->|no| EB
+    B -->|yes| C
+
+    C --> |no| EC
+    C --> |yes| D
+
+    D -->|no| ED
+    D -->|yes| E
+
+    E -->|no| EE
+    E -->|yes| F
+
+    F -->|no| G[Show popup UserAgent page]
+    F -->|yes| H
+
+    I -->|no| H{is popup}
+    I -->|yes| H[Show popup UserAgent page]
+
+    H -->|no| J{is touch}
+    H -->|yes| K[Show touch UserAgent interface]
+
+    J -->|no| L{is wap}
+    J -->|yes| M[Show touch UserAgent interface]

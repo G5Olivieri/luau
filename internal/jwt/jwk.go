@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// TODO: stop thinking OOP
 type JWK struct {
 	Kty     string   `json:"kty"`
 	Use     *string  `json:"use"`
@@ -24,31 +25,7 @@ type JWK struct {
 	X5tS256 *string  `json:"x5t#S256"`
 }
 
-type KeyUsage []string
-
-type KeySpec struct {
-	Name  string
-	Usage KeyUsage
-}
-
-type Key[T interface{}] struct {
-	ID      string
-	KeySpec KeySpec
-	Value   T
-}
-
-type RSAPublicKeyHash string
-
-type RSAPublicKeySpec struct {
-	KeySpec
-	Hash      RSAPublicKeyHash
-	KeyLength int
-}
-
-type RSAPublicKey = Key[*rsa.PublicKey]
-
-func EncodeRSAPublicKey() (string, error) {
-
+func EncodeRSAPublicKey(rsaKey *rsa.PrivateKey, id, name, alg string) (string, error) {
 	template := &x509.Certificate{
 		// TODO: I don't know how I should fill these fields. Study more!
 		SerialNumber: big.NewInt(12345),

@@ -189,6 +189,7 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 }
 
 func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.Request) (AuthRequest, bool) {
+	// TODO: if `request` was provided request params supersedes those passed
 	if r.Method == http.MethodPost {
 		if r.Header.Get("content-type") != "application/x-www-form-urlencoded" {
 			body := []byte("Content-Type is invalid")

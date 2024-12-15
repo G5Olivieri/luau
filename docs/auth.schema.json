@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenID Connect Authentication Request",
+  "description": "Schema for validating parameters of an OpenID Connect authentication request",
+  "type": "object",
+  "properties": {
+    "response_type": {
+      "type": "string",
+      "enum": ["code", "token", "id_token", "id_token token", "code id_token", "code token", "code id_token token"],
+      "description": "[Table ref](https://openid.net/specs/openid-connect-core-1_0.html#Authentication)"
+    },
+    "client_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "redirect_uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_]+(\\s+[a-zA-Z0-9_]+)*$",
+      "description": "it must contain `openid`, if `openid` is not present the behavior is unspecified"
+    },
+    "code_challenge": {
+      "type": "string",
+      "description": "REQUIRED. Code challenge"
+    },
+    "code_challenge_method": {
+      "type": "string",
+      "enum": ["S256", "plain"],
+      "description": "Defaults to \"plain\" if not present in the request."
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1,
+      "description": "RECOMMENDED. Opaque value used to maintain state between the request and the callback. Typically, Cross-Site Request Forgery (CSRF, XSRF) mitigation is done by cryptographically binding the value of this parameter with a browser cookie."
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 1
+    },
+    "response_mode": {
+      "type": "string",
+      "enum": ["query", "fragment", "form_post"]
+    },
+    "prompt": {
+      "type": "string",
+      "enum": ["login", "select_account", "consent", "none"]
+    },
+    "display": {
+      "type": "string",
+      "enum": ["page", "popup", "touch", "wap"]
+    },
+    "login_hint": {
+      "type": "string"
+    },
+    "acr_values": {
+      "type": "string"
+    },
+    "max_age": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ui_locales": {
+      "type": "string"
+    },
+    "id_token_hint": {
+      "type": "string"
+    },
+    "request": {
+      "type": "string",
+      "description": "This parameter enables OpenID Connect requests to be passed in a single, self-contained parameter and to be optionally signed and/or encrypted. The parameter value is a Request Object value, as specified in Section 6.1. It represents the request as a JWT whose Claims are the request parameters"
+    },
+    "request_uri": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "required": ["response_type", "client_id", "redirect_uri", "scope", "code_challenge", ""]
+}

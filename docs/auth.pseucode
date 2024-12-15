@@ -1,0 +1,84 @@
+auth
+    // Verificação de parâmetros obrigatórios e malformados
+    if some required parameter is missing or malformed
+        return invalid_request
+
+    // Verificação do redirect_uri
+    if not is_valid(redirect_uri)
+        return invalid_request_uri
+
+    // Verificação do parâmetro request (utilizado para passar JWTs)
+    if request is provided
+        if not is_request_supported
+            return request_not_supported
+        if not is_valid(request)
+            return invalid_request_object
+
+    // Verificação do request_uri (URI que contém os parâmetros de requisição)
+    if request_uri is provided and not is_request_uri_supported
+        return request_uri_not_supported
+
+    // Verificação de suporte a registro dinâmico do cliente (não diretamente relacionado ao fluxo de autorização)
+    if registration is provided and not is_registration_supported
+        return registration_not_supported
+
+    // Verificação do tipo de resposta
+    if response_type != code
+        return unsupported_response_type
+
+    // Verificação do client_id
+    if client_id not found
+        return client_not_found
+
+    // Verificação se o redirect_uri está registrado para o client_id
+    if not client_id.redirect_uris.includes(redirect_uri)
+        return invalid_client
+
+    // Verificação do escopo
+    if scope does not contain openid
+        return invalid_scope
+
+    // Processamento do nonce
+    if nonce is provided
+        must add nonce to id_token
+
+    // Validação do id_token_hint
+    if id_token_hint is provided
+        if not is_valid(id_token_hint)
+            return invalid_request
+        if the audience of id_token_hint does not include the authorization server
+            return invalid_request
+        // Outras verificações relacionadas ao id_token_hint...
+
+    // Determinação do próximo passo com base na sessão do usuário e parâmetros de prompt
+    if user is in session
+        if max_age is provided
+            must add auth_time to id_token
+            if max_age exceeds the time since user.last_login
+                if prompt is none
+                    return login_required
+                else
+                    next_step = authentication
+        else
+            if prompt is none
+                if is_login_required
+                    return login_required
+                if is_consent_required
+                    return consent_required
+                if is_account_selection_needed
+                    return account_selection_required
+                if is_interaction_needed
+                    return interaction_required
+            if prompt is login
+                next_step = authentication
+                next_step = consent
+            if user did not previously consent to the client's requested access
+            if prompt is select_account
+                next_step = select_account
+
+    else
+        // Usuário não está em sessão, então é necessário iniciar a autenticação
+        next_step = authentication
+
+    // Executar o próximo passo determinado
+    execute next_step

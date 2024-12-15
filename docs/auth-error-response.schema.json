@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenID Connect Authentication Error Response",
+  "description": "Schema for validating parameters of an OpenID Connect authentication error response",
+  "type": "object",
+  "properties": {
+    "error": {
+        "type": "string",
+        "enum": [
+          "invalid_request",
+          "unauthorized_client",
+          "access_denied",
+          "unsupported_response_type",
+          "invalid_scope",
+          "server_error",
+          "temporarily_unavailable",
+          "interaction_required",
+          "login_required",
+          "account_selection_required",
+          "consent_required",
+          "invalid_request_uri",
+          "invalid_request_object",
+          "request_not_supported",
+          "request_uri_not_supported",
+          "registration_not_supported"
+        ]
+    },
+    "error_description": {
+        "type": "string"
+    },
+    "error_uri": {
+        "type": "string",
+        "format": "uri",
+        "description": "URI identifying a human-readable web page with information about the error"
+    },
+    "state": {
+        "type": "string",
+        "description": "REQUIRED if a \"state\" parameter was present in the client authorization request. The exact value received from the client."
+    }
+  },
+  "required": ["error"]
+}
