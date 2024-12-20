@@ -1,20 +1,20 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
-	"crypto/rsa"
-	"encoding/base64"
+	"encoding/json"
 	"log"
 	"net/http"
 	"text/template"
+	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
 	"github.com/G5Olivieri/luau/internal/csrf"
-	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
+	"github.com/G5Olivieri/luau/internal/kms"
 	"github.com/G5Olivieri/luau/internal/oidc"
 	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
@@ -81,56 +81,76 @@ func main() {
 		return
 	}
 
-	userRepository := user.NewInMemoryUserRepository([]user.User{
-		{
-			ID:       uuid.NewString(),
-			Username: "glayson",
-			Password: password,
-		},
-	})
+	userID := uuid.NewString()
+	users := make(map[string]*user.User)
+	users[userID] = &user.User{
+		ID:        userID,
+		Username:  "glayson",
+		Password:  password,
+		LastLogin: 0,
+	}
+	userRepository := user.NewInMemoryUserRepository(users)
 	clientRepository := client.NewInMemoryClientRepository([]client.Client{
 		{ID: "glayssinho", RawRedirectURI: "http://localhost:3000/callback"},
 	})
-	log.Println(base64.StdEncoding.EncodeToString(csrfSecret))
 
-	authorizationCodeEncoder := oidc.NewJWTAuthorizationCodeEncoder(jwt.SigningMethodHS256, func(_ *jwt.Token) (interface{}, error) {
-		return codeSecretKey, nil
-	})
-	idTokenPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Println("GenerateKey")
-		log.Fatalln(err.Error())
-		return
-	}
-	idTokenJWTEncoder := oidc.NewIDTokenJWTEncoder(jwt.SigningMethodRS256, func(token *jwt.Token) (interface{}, error) {
-		if token == nil {
-			return idTokenPrivateKey, nil
-		}
-		return &idTokenPrivateKey.PublicKey, nil
-	})
-
-	// internaljwtSecret := make([]byte, 32)
-	// _, err = rand.Read(internaljwtSecret)
-	// if err != nil {
-	// 	log.Println("Genereate key")
-	// 	log.Fatalln(err.Error())
-	// }
-	// internaljwt := luaujwt.NewJWTHMAC256(internaljwtSecret)
-
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Println("GenerateKey")
-		log.Fatalln(err.Error())
-		return
-	}
-	internaljwt := luaujwt.NewJWTPSS256(rsaKey)
-
-	csrfTokenGenerator := csrf.NewHMACGenerator(csrfSecret)
 	sessionStore := session.NewInMemorySessionStore(make(map[string]*session.Session))
+	httpSession := session.NewHttpSession(sessionStore, "session", 14*time.Hour)
 
-	authHandler := oidc.NewAuthHandler(clientRepository, csrfTokenGenerator, sessionStore, authorizationCodeEncoder, *tmpl)
-	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, authorizationCodeEncoder, csrfTokenGenerator, sessionStore)
-	tokenHandler := oidc.NewTokenHandler(clientRepository, authorizationCodeEncoder, idTokenJWTEncoder, userRepository, 3*3600, internaljwt)
+	csrfSync := csrf.NewSynchronizerTokenPattern(httpSession, "csrf")
+
+	codeRepository := oidc.NewInMemoryCodeRepository(make(map[string]*oidc.Code), 5*time.Minute)
+
+	kmsvalue := kms.NewInMemoryKMS()
+	accessTokenKey, err := kmsvalue.GenerateKey(context.Background(), kms.KeySpec{
+		Alg:    "RS256",
+		Type:   "RSA",
+		Use:    "sig",
+		KeyOps: []string{"sign", "verify"},
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	refreshTokenKey, err := kmsvalue.GenerateKey(context.Background(), kms.KeySpec{
+		Alg:    "HS256",
+		Type:   "oct",
+		Use:    "sig",
+		KeyOps: []string{"sign", "verify"},
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	idTokenKey, err := kmsvalue.GenerateKey(context.Background(), kms.KeySpec{
+		Alg:    "ES256",
+		Type:   "EC",
+		Use:    "sig",
+		KeyOps: []string{"sign", "verify"},
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	issuer := "https://luau.org"
+	idTokenJWTEncoder := oidc.NewIDTokenJWTEncoder(kmsvalue, issuer, 2*60*60, idTokenKey.ID)                // 2 hours
+	accessTokenEncoder := oidc.NewAccessTokenJWTEncoder(kmsvalue, issuer, 50*60, accessTokenKey.ID)         // 50 minutes
+	refreshTokenEncoder := oidc.NewRefreshTokenJWTEncoder(kmsvalue, issuer, 2*24*60*50, refreshTokenKey.ID) // 2 days
+
+	authHandler := oidc.NewAuthHandler(clientRepository, httpSession, userRepository, csrfSync, codeRepository, *tmpl)
+	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, csrfSync, httpSession, codeRepository)
+	tokenHandler := oidc.NewTokenHandler(
+		clientRepository,
+		userRepository,
+		codeRepository,
+		httpSession,
+		accessTokenEncoder,
+		refreshTokenEncoder,
+		idTokenJWTEncoder,
+	)
 
 	r := httprouter.New()
 	// Authentication Request MUST support the use of the HTTP GET and POST
@@ -140,7 +160,17 @@ func main() {
 	r.POST("/oidc/token", NoCacheHandler(tokenHandler.Handle))
 	r.POST("/oidc/login", NoCacheHandler(loginHandler.Handle))
 
-	// r.GET("/oidc/.well-known/jwks.json", ())
+	r.GET("/oidc/.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		jwks, err := kmsvalue.JWKS()
+		if err != nil {
+			log.Println(err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		jwksResponse := make(map[string]interface{})
+		jwksResponse["jwks"] = jwks
+		json.NewEncoder(w).Encode(jwksResponse)
+	})
 
 	log.Println("Listening :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))

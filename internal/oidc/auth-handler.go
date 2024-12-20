@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -13,9 +14,28 @@ import (
 	"github.com/G5Olivieri/luau/internal/client"
 	"github.com/G5Olivieri/luau/internal/csrf"
 	"github.com/G5Olivieri/luau/internal/session"
-	"github.com/google/uuid"
+	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/julienschmidt/httprouter"
 )
+
+type AuthRequest struct {
+	ClientID            string
+	RedirectURI         string
+	State               string
+	ResponseType        string
+	Scope               string
+	MaxAge              *int
+	LoginHint           string
+	Nonce               string
+	Display             string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	UILocales           string
+	Prompt              string
+	IDTokenHint         string
+	ACRValues           string
+	ResponseMode        string
+}
 
 type AuthorizePage struct {
 	ClientID     string
@@ -24,41 +44,36 @@ type AuthorizePage struct {
 	State        string
 	Scope        string
 	CSRFToken    string
+	LoginHint    string
 }
 
 type AuthHandler struct {
-	clientRepository         client.ClientRepository
-	csrfTokenGenerator       csrf.Generator
-	sessionStore             session.SessionStore
-	authorizationCodeEncoder AuthorizationCodeEncoder
-	tmpl                     template.Template
+	clientRepository client.ClientRepository
+	httpSession      session.HTTPSession
+	csrfSync         *csrf.SynchronizerTokenPattern
+	userRepository   user.UserRepository
+	codeRepository   CodeRepository
+	tmpl             template.Template
 }
 
 func NewAuthHandler(
 	clientRepository client.ClientRepository,
-	csrfTokenGenerator csrf.Generator,
-	sessionStore session.SessionStore,
-	authorizationCodeEncoder AuthorizationCodeEncoder,
+	httpSession session.HTTPSession,
+	userRepository user.UserRepository,
+	csrfSync *csrf.SynchronizerTokenPattern,
+	codeRepository CodeRepository,
 	tmpl template.Template,
 ) AuthHandler {
 	return AuthHandler{
-		clientRepository:         clientRepository,
-		csrfTokenGenerator:       csrfTokenGenerator,
-		sessionStore:             sessionStore,
-		authorizationCodeEncoder: authorizationCodeEncoder,
-		tmpl:                     tmpl,
+		clientRepository: clientRepository,
+		csrfSync:         csrfSync,
+		httpSession:      httpSession,
+		userRepository:   userRepository,
+		codeRepository:   codeRepository,
+		tmpl:             tmpl,
 	}
 }
 
-type AuthRequest struct {
-	ClientID     string
-	RedirectURI  string
-	State        string
-	ResponseType string
-	Scope        string
-}
-
-// TODO: response_mode, nonce, display, prompt, max_age, ui_locales, id_token_hint, login_hint, acr_values
 func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	data, ok := h.parseAndValidateAuthRequest(w, r)
 
@@ -66,7 +81,7 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		return
 	}
 
-	c, err := h.clientRepository.GetByID(r.Context(), data.ClientID)
+	clientModel, err := h.clientRepository.GetByID(r.Context(), data.ClientID)
 	if errors.Is(err, client.NotFoundErr) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -79,105 +94,146 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		return
 	}
 
-	if c.RawRedirectURI != data.RedirectURI {
+	if clientModel.RawRedirectURI != data.RedirectURI {
 		log.Println("provided redirect uri is not registered redirect uri")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	sessionIDCookie, err := r.Cookie("session")
-	var sessionID string
-	var sessionValue *session.Session
+	sessionValue, err := h.httpSession.GetFromCookieOrCreate(r.Context(), w, r)
 
-	if errors.Is(err, http.ErrNoCookie) {
-		log.Println(err.Error())
-		sessionID = uuid.NewString()
-	} else if err != nil {
-		log.Println(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	} else {
-		sessionID = sessionIDCookie.Value
-		if sessionID == "" {
-			sessionID = uuid.NewString()
-		}
-	}
-
-	sessionValue, err = h.sessionStore.Get(r.Context(), sessionID)
-	if errors.Is(err, session.ErrNotFound) {
-		log.Println(err.Error())
-		sessionValue = &session.Session{
-			ID:   sessionID,
-			Data: make(map[string]interface{}),
-		}
-	} else if err != nil {
-		log.Println(err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if v, ok := sessionValue.Data["userId"]; ok {
-		userID, ok := v.(string)
-		if ok {
-			code, err := h.authorizationCodeEncoder.Encode(AuthorizationCode{
-				UserID: userID,
-				// short-lived token, less than 10 minutes
-				Exp: time.Now().Add(time.Duration(5) * time.Minute),
-			})
-
-			if err != nil {
-				log.Println(err.Error())
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			redirectURI, err := url.Parse(data.RedirectURI)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				body := []byte("malformed redirect_uri")
-				w.Header().Set("content-type", "text/plain")
-				w.Header().Set("content-length", strconv.Itoa(len(body)))
-				w.Write(body)
-				return
-			}
-
-			q := redirectURI.Query()
-			state := r.Form.Get("state")
-			if state != "" {
-				q.Set("state", state)
-			}
-
-			q.Set("code", code)
-			redirectURI.RawQuery = q.Encode()
-			http.Redirect(w, r, redirectURI.String(), http.StatusFound)
-			return
-		}
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    sessionID,
-		HttpOnly: true,
-		Secure:   true,
-	})
-
-	h.sessionStore.Set(r.Context(), sessionValue)
-
-	csrfToken, cookieCsrfToken, err := h.csrfTokenGenerator.Generate()
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// TODO: create a session
-	// TODO: create csrf token using https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern
+
+	// TODO: prompt == none
+	// TODO: prompt == consent
+	// TODO: prompt == select_account
+	if data.Prompt == "login" {
+		h.renderAuthPage(w, r, sessionValue, data)
+		return
+	}
+
+	sessionUserID, ok := sessionValue.Data["userId"]
+
+	if !ok {
+		if data.Nonce != "" {
+			// Add nonce in id_token
+			sessionValue.Data[fmt.Sprintf("%s.nonce", clientModel.ID)] = data.Nonce
+		}
+
+		if data.CodeChallenge != "" {
+			sessionValue.Data[fmt.Sprintf("%s.code_challenge", clientModel.ID)] = data.CodeChallenge
+			sessionValue.Data[fmt.Sprintf("%s.code_challenge_method", clientModel.ID)] = data.CodeChallengeMethod
+		}
+
+		h.renderAuthPage(w, r, sessionValue, data)
+		return
+	}
+
+	userID, ok := sessionUserID.(string)
+	if !ok {
+		log.Println("invalid type to userID in session")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	redirectURI, err := url.Parse(data.RedirectURI)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		body := []byte("malformed redirect_uri")
+		w.Header().Set("content-type", "text/plain")
+		w.Header().Set("content-length", strconv.Itoa(len(body)))
+		w.Write(body)
+		return
+	}
+
+	q := redirectURI.Query()
+
+	state := data.State
+
+	if state != "" {
+		q.Set("state", state)
+	}
+
+	userModel, err := h.userRepository.GetByID(r.Context(), userID)
+	if errors.Is(err, user.ErrNotFound) {
+		log.Println("UserID in session not found")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err != nil {
+		log.Println(err.Error())
+		redirectError(w, r, *redirectURI, q, "server_error", "internal server error")
+		return
+	}
+
+	if data.MaxAge != nil {
+		if time.Now().Unix() > userModel.LastLogin+int64(*data.MaxAge) {
+			h.renderAuthPage(w, r, sessionValue, data)
+			return
+		}
+	}
+
+	// TODO: consent and select_account
+	var nonce, codeChallenge, codeChallengeMethod *string
+	if data.Nonce != "" {
+		nonce = &data.Nonce
+	}
+	if data.CodeChallenge != "" {
+		codeChallenge = &data.CodeChallenge
+		codeChallengeMethod = &data.CodeChallengeMethod
+	}
+
+	code, err := h.codeRepository.Create(r.Context(), CodeToCreate{
+		User:                *userModel,
+		Client:              clientModel,
+		RedirectURI:         data.RedirectURI,
+		Nonce:               nonce,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+	})
+
+	if err != nil {
+		log.Println("Generate Code error")
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	q.Set("code", code.ID)
+	redirectURI.RawQuery = q.Encode()
+
+	ok = h.saveSession(w, r, sessionValue, data)
+
+	if !ok {
+		return
+	}
+
+	http.Redirect(w, r, redirectURI.String(), http.StatusFound)
+}
+
+func (h AuthHandler) renderAuthPage(w http.ResponseWriter, r *http.Request, sessionValue *session.Session, data AuthRequest) {
+	csrfToken, err := h.csrfSync.Generate(sessionValue)
+	if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ok := h.saveSession(w, r, sessionValue, data)
+
+	if !ok {
+		return
+	}
 
 	w.Header().Add("content-type", "text/html")
-	http.SetCookie(w, &http.Cookie{
-		Name:     "csrf",
-		Value:    cookieCsrfToken,
-		HttpOnly: true,
-		Secure:   true,
-	})
+
+	// TODO: locales: ui_locales -> cookie -> accept-language
+	// TODO: display: popup, touch, wap. I don't know the differences
 	h.tmpl.Execute(w, AuthorizePage{
 		ClientID:     data.ClientID,
 		RedirectURI:  data.RedirectURI,
@@ -185,7 +241,36 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		State:        data.State,
 		Scope:        data.Scope,
 		CSRFToken:    csrfToken,
+		LoginHint:    data.LoginHint,
 	})
+}
+
+func (h AuthHandler) saveSession(w http.ResponseWriter, r *http.Request, sessionValue *session.Session, data AuthRequest) bool {
+	if err := h.httpSession.SaveAndSetToCookie(r.Context(), w, sessionValue); err != nil {
+		redirectURI, err := url.Parse(data.RedirectURI)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			body := []byte("malformed redirect_uri")
+			w.Header().Set("content-type", "text/plain")
+			w.Header().Set("content-length", strconv.Itoa(len(body)))
+			w.Write(body)
+			return false
+		}
+
+		q := redirectURI.Query()
+		state := data.State
+		if state != "" {
+			q.Set("state", state)
+		}
+
+		q.Set("error", "internal_server_error")
+		q.Set("error_description", "cannot save session")
+		redirectURI.RawQuery = q.Encode()
+		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
+		return false
+	}
+
+	return true
 }
 
 func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.Request) (AuthRequest, bool) {
@@ -200,6 +285,7 @@ func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.
 			return AuthRequest{}, false
 		}
 	}
+
 	err := r.ParseForm()
 	if err != nil {
 		body := []byte("cannot parse params")
@@ -273,11 +359,119 @@ func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.
 		return AuthRequest{}, false
 	}
 
+	maxAgeParamValue, ok := getParamWithRedirect(w, r, "max_age", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	var maxAge *int = nil
+
+	if maxAgeParamValue != "" {
+		maxAgeIntValue, err := strconv.Atoi(maxAgeParamValue)
+		if err != nil {
+			log.Println(err.Error())
+			redirectError(w, r, *redirectURI, q, "invalid_request", "invalid max_age value")
+			return AuthRequest{}, false
+		}
+		maxAge = &maxAgeIntValue
+	}
+
+	loginHint, ok := getParamWithRedirect(w, r, "login_hint", *redirectURI, q)
+
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	nonce, ok := getParamWithRedirect(w, r, "nonce", *redirectURI, q)
+
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	// TODO: response_mode, display, prompt, ui_locales, id_token_hint, acr_values
+	display, ok := getParamWithRedirect(w, r, "display", *redirectURI, q)
+
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	if display != "" && display == "page" && display != "popup" && display != "touch" && display != "wap" {
+		redirectError(w, r, *redirectURI, q, "invalid_request", "invalid display value")
+		return AuthRequest{}, false
+	}
+
+	codeChallenge, ok := getParamWithRedirect(w, r, "code_challenge", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	codeChallengeMethod, ok := getParamWithRedirect(w, r, "code_challenge_method", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	if codeChallengeMethod == "" {
+		codeChallengeMethod = "plain"
+	}
+
+	if codeChallengeMethod != "plain" && codeChallengeMethod != "S256" {
+		redirectError(w, r, *redirectURI, q, "invalid_request", "invalid code_challenge_method value")
+		return AuthRequest{}, false
+	}
+
+	uiLocales, ok := getParamWithRedirect(w, r, "ui_locales", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	prompt, ok := getParamWithRedirect(w, r, "prompt", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	if prompt != "" && prompt != "none" && prompt != "login" && prompt != "consent" && prompt != "select_account" {
+		redirectError(w, r, *redirectURI, q, "invalid_request", "invalid prompt value")
+		return AuthRequest{}, false
+	}
+
+	idTokenHint, ok := getParamWithRedirect(w, r, "id_token_hint", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	// TODO: Study more
+	acrValues, ok := getParamWithRedirect(w, r, "acr_value", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	responseMode, ok := getParamWithRedirect(w, r, "response_mode", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
+	// TODO: fragment, form post
+	if responseMode != "" && responseMode != "query" {
+		redirectError(w, r, *redirectURI, q, "invalid_request", "invalid response_mode value")
+		return AuthRequest{}, false
+	}
+
 	return AuthRequest{
-		ClientID:     clientID,
-		RedirectURI:  rawRedirectURI,
-		State:        state,
-		ResponseType: responseType,
-		Scope:        scope,
+		ClientID:            clientID,
+		RedirectURI:         rawRedirectURI,
+		State:               state,
+		ResponseType:        responseType,
+		Scope:               scope,
+		MaxAge:              maxAge,
+		LoginHint:           loginHint,
+		Nonce:               nonce,
+		Display:             display,
+		Prompt:              prompt,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+		UILocales:           uiLocales,
+		IDTokenHint:         idTokenHint,
+		ACRValues:           acrValues,
+		ResponseMode:        responseMode,
 	}, true
 }

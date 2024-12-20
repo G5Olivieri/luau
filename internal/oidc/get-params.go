@@ -7,24 +7,24 @@ import (
 	"strconv"
 )
 
-func getParam(form url.Values, name string) (string, error) {
+func getParam(form url.Values, name string) (string, string) {
 	// https://datatracker.ietf.org/doc/html/rfc6749#section-3.1
 	// Request and response parameters
 	// MUST NOT be included more than once.
 	values := form[name]
 	if len(values) > 1 {
-		return "", fmt.Errorf("%s MUST NOT BE included more than once", name)
+		return "", fmt.Sprintf("%s MUST NOT be included more than once", name)
 	}
 	if len(values) == 0 {
-		return "", nil
+		return "", ""
 	}
-	return values[0], nil
+	return values[0], ""
 }
 
 func getRequiredParam(w http.ResponseWriter, r *http.Request, name string) (string, bool) {
 	value, err := getParam(r.Form, name)
-	if err != nil {
-		body := []byte(err.Error())
+	if err != "" {
+		body := []byte(err)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Header().Add("content-type", "text/plain")
 		w.Header().Add("content-length", strconv.Itoa(len(body)))
@@ -52,12 +52,14 @@ func getRequiredParamWithRedirect(
 ) (string, bool) {
 	value, err := getParam(r.Form, name)
 
-	if err != nil {
-		return redirectError(w, r, redirectURI, query, "invalid_request", err.Error())
+	if err != "" {
+		redirectError(w, r, redirectURI, query, "invalid_request", err)
+		return "", false
 	}
 
 	if value == "" {
-		return redirectError(w, r, redirectURI, query, "invalid_request", fmt.Sprintf("%s is REQUIRED", name))
+		redirectError(w, r, redirectURI, query, "invalid_request", fmt.Sprintf("%s is REQUIRED", name))
+		return "", false
 	}
 
 	return value, true
@@ -71,8 +73,9 @@ func getParamWithRedirect(
 ) (string, bool) {
 	value, err := getParam(r.Form, name)
 
-	if err != nil {
-		return redirectError(w, r, redirectURI, query, "invalid_request", err.Error())
+	if err != "" {
+		redirectError(w, r, redirectURI, query, "invalid_request", err)
+		return "", false
 	}
 
 	return value, true
@@ -83,12 +86,11 @@ func redirectError(
 	r *http.Request,
 	redirectURI url.URL,
 	query url.Values,
-	error string,
+	errorCode string,
 	description string,
-) (string, bool) {
-	query.Set("error", error)
+) {
+	query.Set("error", errorCode)
 	query.Set("error_description", description)
 	redirectURI.RawQuery = query.Encode()
 	http.Redirect(w, r, redirectURI.String(), http.StatusFound)
-	return "", false
 }

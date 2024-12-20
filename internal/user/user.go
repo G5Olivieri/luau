@@ -3,9 +3,10 @@ package user
 import "github.com/google/uuid"
 
 type User struct {
-	ID       string
-	Username string
-	Password Password
+	ID        string
+	Username  string
+	Password  Password
+	LastLogin int64
 }
 
 func (u User) CheckPassword(password []byte) bool {

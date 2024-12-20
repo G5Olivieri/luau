@@ -2,36 +2,35 @@ package user
 
 import (
 	"context"
-	"fmt"
 )
 
 type InMemoryUserRepository struct {
-	users []User
+	users map[string]*User
 }
 
-func NewInMemoryUserRepository(users []User) InMemoryUserRepository {
+func NewInMemoryUserRepository(users map[string]*User) InMemoryUserRepository {
 	return InMemoryUserRepository{
 		users: users,
 	}
 }
 
-func (r InMemoryUserRepository) GetByUsername(ctx context.Context, username string) (User, error) {
-	for _, u := range r.users {
-		if u.Username == username {
-			return u, nil
+func (r InMemoryUserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
+	for _, v := range r.users {
+		if v.Username == username {
+			return v, nil
 		}
 	}
-	return EmptyUser(), fmt.Errorf("User not found")
+	return nil, ErrNotFound
 }
 
-func (r InMemoryUserRepository) GetByID(ctx context.Context, id string) (User, error) {
-	if id == "" {
-		return EmptyUser(), fmt.Errorf("ID is missing")
+func (r InMemoryUserRepository) GetByID(ctx context.Context, id string) (*User, error) {
+	if u, ok := r.users[id]; ok {
+		return u, nil
 	}
-	for _, u := range r.users {
-		if u.ID == id {
-			return u, nil
-		}
-	}
-	return EmptyUser(), fmt.Errorf("UserID(%s) not found", id)
+	return nil, ErrNotFound
+}
+
+func (r InMemoryUserRepository) Save(ctx context.Context, user User) error {
+	r.users[user.ID] = &user
+	return nil
 }

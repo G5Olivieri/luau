@@ -1,16 +1,16 @@
 package oidc
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
-	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
+	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/julienschmidt/httprouter"
 )
@@ -24,33 +24,44 @@ type TokenHandlerResponse struct {
 }
 
 type TokenHandler struct {
-	clientRepository         client.ClientRepository
-	authorizationCodeEncoder AuthorizationCodeEncoder
-	userRepository           user.UserRepository
-	idTokenJWTEncoder        IDTokenJWTEncoder
-	expiration               int64
-	internalJWT              luaujwt.JWTEncoder
+	clientRepository    client.ClientRepository
+	codeRepository      CodeRepository
+	userRepository      user.UserRepository
+	idTokenJWTEncoder   IDTokenJWTEncoder
+	accessTokenEncoder  AccessTokenEncoder
+	refreshTokenEncoder RefreshTokenEncoder
+	httpSession         session.HTTPSession
 }
 
 func NewTokenHandler(
 	clientRepository client.ClientRepository,
-	authorizationCodeEncoder AuthorizationCodeEncoder,
-	idTokenJWTEncoder IDTokenJWTEncoder,
 	userRepository user.UserRepository,
-	expiration int64,
-	internalJWT luaujwt.JWTEncoder,
+	codeRepository CodeRepository,
+	httpSession session.HTTPSession,
+	accessTokenEncoder AccessTokenEncoder,
+	refreshTokenEncoder RefreshTokenEncoder,
+	idTokenJWTEncoder IDTokenJWTEncoder,
 ) TokenHandler {
 	return TokenHandler{
-		clientRepository:         clientRepository,
-		authorizationCodeEncoder: authorizationCodeEncoder,
-		userRepository:           userRepository,
-		idTokenJWTEncoder:        idTokenJWTEncoder,
-		expiration:               expiration,
-		internalJWT:              internalJWT,
+		clientRepository:    clientRepository,
+		codeRepository:      codeRepository,
+		userRepository:      userRepository,
+		idTokenJWTEncoder:   idTokenJWTEncoder,
+		httpSession:         httpSession,
+		accessTokenEncoder:  accessTokenEncoder,
+		refreshTokenEncoder: refreshTokenEncoder,
 	}
 }
 
 func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	contentType := r.Header.Get("content-type")
+
+	if contentType != "application/x-www-form-urlencoded" {
+		log.Println("invalid request content-type")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	err := r.ParseForm()
 	if err != nil {
 		body := []byte("cannot parse params")
@@ -71,43 +82,8 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	redirectURI, err := url.Parse(rawRedirectURI)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		body := []byte("malformed redirect_uri")
-		w.Header().Set("content-type", "text/plain")
-		w.Header().Set("content-length", strconv.Itoa(len(body)))
-		w.Write(body)
-		return
-	}
-
-	client, err := h.clientRepository.GetByID(r.Context(), clientID)
-	if err != nil {
-		log.Println(err.Error())
-		w.WriteHeader(http.StatusUnauthorized)
-		body := []byte("unauthorized")
-		w.Header().Set("content-type", "text/plain")
-		w.Header().Set("content-length", strconv.Itoa(len(body)))
-		w.Write(body)
-		return
-	}
-
-	formattedRedirectURIString := fmt.Sprintf("%s://%s%s", redirectURI.Scheme, redirectURI.Host, redirectURI.EscapedPath())
-	if client.RawRedirectURI != formattedRedirectURIString {
-		q := redirectURI.Query()
-		q.Set("error", "unouthorized_client")
-		q.Set("error_description", "invalid redirect_uri to client")
-		redirectURI.RawQuery = q.Encode()
-		http.Redirect(w, r, redirectURI.String(), http.StatusFound)
-		return
-	}
-
 	grantType, ok := getRequiredParam(w, r, "grant_type")
-	if !ok {
-		return
-	}
 
-	code, ok := getRequiredParam(w, r, "code")
 	if !ok {
 		return
 	}
@@ -117,51 +93,108 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	authorizationCode, err := h.authorizationCodeEncoder.Decode(code)
+	codeID, ok := getRequiredParam(w, r, "code")
+	if !ok {
+		return
+	}
+
+	code, err := h.codeRepository.GetByID(r.Context(), codeID)
+
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	user, err := h.userRepository.GetByID(r.Context(), authorizationCode.UserID)
+	// It doesn't allowed to use code twice
+	if err = h.codeRepository.Delete(r.Context(), *code); err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO: confidential client type
+	if code.Client.ID != clientID {
+		log.Println("Client isn't same")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if code.RedirectURI != rawRedirectURI {
+		log.Println("RedirectURI isn't same")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if time.Now().Unix() < code.ExpireAt {
+		log.Println("Expired code")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if code.CodeChallenge != nil && code.CodeChallengeMethod != nil {
+		codeVerifier, err := getParam(r.Form, "code_verifier")
+		if err != "" {
+			log.Println(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if *code.CodeChallengeMethod == "plain" {
+			if codeVerifier != *code.CodeChallenge {
+				log.Println("invalid code_challenge")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		} else if *code.CodeChallengeMethod == "S256" {
+			hashedVerifier := sha256.Sum256([]byte(codeVerifier))
+			if base64.RawURLEncoding.EncodeToString(hashedVerifier[:]) != *code.CodeChallenge {
+				log.Println("invalid code_challenge")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		} else {
+			log.Println("invalid code_challenge_method in repository")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	userModel, err := h.userRepository.GetByID(r.Context(), code.User.ID)
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	now := time.Now()
-	// TODO: generate AccessToken, TokenType, ExpiresIn, RefreshToken
-	accessToken, err := h.internalJWT.EncodeCompact(luaujwt.RegisteredClaims{
-		Sub: user.Username,
-		// TODO: get from config
-		Exp: now.Add(time.Duration(h.expiration) * time.Second).Unix(),
+	accessToken, err := h.accessTokenEncoder.Encode(r.Context(), AccessTokenRequest{
+		Sub:      userModel.Username,
+		Audience: []string{clientID},
 	})
+
 	if err != nil {
-		log.Println("AccessToken error")
-		w.WriteHeader(500)
+		log.Println("AccessToken error", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	refreshToken, err := h.internalJWT.EncodeCompact(luaujwt.RegisteredClaims{
-		Sub: user.Username,
-		// TODO: get from config
-		Exp: now.Add(time.Duration(5 * time.Hour)).Unix(),
+	refreshToken, err := h.refreshTokenEncoder.Encode(r.Context(), RefreshTokenRequest{
+		Sub:      userModel.Username,
+		Audience: []string{clientID},
 	})
+
 	if err != nil {
-		log.Println("RefreshToken error")
-		w.WriteHeader(500)
+		log.Println("RefreshToken error", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	idToken, err := h.idTokenJWTEncoder.Encode(IDToken{
-		Issuer:    "https://luau.com",
-		Subject:   user.ID,
-		IssuedAt:  now,
-		ExpiresAt: now.Add(time.Duration(h.expiration) * time.Second),
-		Audience:  []string{client.ID},
-		// TODO: AtHash
+	idToken, err := h.idTokenJWTEncoder.Encode(r.Context(), IDTokenRequest{
+		Subject:  userModel.ID,
+		Audience: []string{code.Client.ID},
+		Nonce:    code.Nonce,
+		AuthTime: &code.CreatedAt,
+		Amr:      code.AuthenticationMethods,
 	})
 
 	if err != nil {
@@ -170,9 +203,10 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
+	// TODO: generate AccessToken, TokenType, ExpireIn, RefreshToken
 	response := TokenHandlerResponse{
 		TokenType:    "Bearer",
-		ExpiresIn:    h.expiration,
+		ExpiresIn:    h.accessTokenEncoder.ExpiresIn(),
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		IDToken:      idToken,

@@ -5,8 +5,9 @@ type URI string
 
 type JoseRegisteredHeader struct {
 	// https://www.rfc-editor.org/rfc/rfc7518
-	Alg string  `json:"alg"`
-	Jku *URI    `json:"jku"`
-	Jwk *JWK    `json:"jwk"`
-	Kid *string `json:"kid"`
+	Alg  string  `json:"alg"`
+	Type *string `json:"typ"`
+	Jku  *URI    `json:"jku"`
+	Jwk  *JWK    `json:"jwk"`
+	Kid  *string `json:"kid"`
 }

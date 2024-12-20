@@ -2,118 +2,98 @@
 package jwt
 
 import (
-	"crypto"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/G5Olivieri/luau/internal/kms"
 )
 
-type RegisteredClaims struct {
-	Sub string `json:"sub"`
-	Exp int64  `json:"exp"`
-}
+var (
+	ErrMalFormedJWT     = errors.New("mal formed jwt")
+	ErrKeyIDNotProvided = errors.New("key id not provided")
+	ErrInvalidSignature = errors.New("invalid signature")
+)
 
-type JWTEncoder interface {
-	EncodeCompact(claims RegisteredClaims) (string, error)
-}
-
-type JWTHMAC256 struct {
-	secret []byte
-}
-
-func NewJWTHMAC256(secret []byte) JWTHMAC256 {
-	return JWTHMAC256{
-		secret: secret,
+func EncodeCompact(ctx context.Context, kmsValue kms.KMS, id string, claims interface{}) (string, error) {
+	key, err := kmsValue.Get(ctx, id)
+	if err != nil {
+		return "", err
 	}
-}
-
-func (j JWTHMAC256) EncodeCompact(claims RegisteredClaims) (string, error) {
-	header := "{\"alg\":\"HS256\",\"typ\":\"JWT\"}"
+	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", key.KeySpec.Alg, id)
 	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}
 	headerBase64 := base64.RawURLEncoding.EncodeToString([]byte(header))
 	payloadBase64 := base64.RawURLEncoding.EncodeToString(payload)
-	signature := headerBase64 + "." + payloadBase64
-	mac := hmac.New(sha256.New, j.secret)
-	_, err = mac.Write([]byte(signature))
-	if err != nil {
-		return "", err
+	messageToSign := headerBase64 + "." + payloadBase64
+	var signature []byte
+	if strings.HasPrefix(key.KeySpec.Alg, "H") {
+		signature, err = kmsValue.GenerateMAC(ctx, id, []byte(messageToSign))
+	} else {
+		signature, err = kmsValue.Sign(ctx, id, []byte(messageToSign))
 	}
-	signatureMac := mac.Sum(nil)
-	signatureMacBase64 := base64.RawURLEncoding.EncodeToString(signatureMac)
-
-	return headerBase64 + "." + payloadBase64 + "." + signatureMacBase64, nil
-}
-
-type JWTRSA256 struct {
-	key *rsa.PrivateKey
-}
-
-func NewJWTRSA256(key *rsa.PrivateKey) JWTRSA256 {
-	return JWTRSA256{
-		key: key,
-	}
-}
-
-func (j JWTRSA256) EncodeCompact(claims RegisteredClaims) (string, error) {
-	header := "{\"alg\":\"RS256\",\"typ\":\"JWT\"}"
-	payload, err := json.Marshal(claims)
-	if err != nil {
-		return "", err
-	}
-	headerBase64 := base64.RawURLEncoding.EncodeToString([]byte(header))
-	payloadBase64 := base64.RawURLEncoding.EncodeToString(payload)
-	signatureStr := headerBase64 + "." + payloadBase64
-	hasher := crypto.SHA256.New()
-	_, err = hasher.Write([]byte(signatureStr))
-	if err != nil {
-		return "", err
-	}
-	signature, err := rsa.SignPKCS1v15(nil, j.key, crypto.SHA256, hasher.Sum(nil))
 	if err != nil {
 		return "", err
 	}
 	signatureBase64 := base64.RawURLEncoding.EncodeToString(signature)
-
-	return headerBase64 + "." + payloadBase64 + "." + signatureBase64, nil
+	return messageToSign + "." + signatureBase64, nil
 }
 
-type JWTPSS256 struct {
-	key *rsa.PrivateKey
-}
+func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload any) error {
+	splitted := strings.Split(token, ".")
+	if len(splitted) != 3 {
+		return ErrMalFormedJWT
+	}
 
-func NewJWTPSS256(key *rsa.PrivateKey) JWTPSS256 {
-	return JWTPSS256{
-		key: key,
+	decodedHeader, err := base64.RawURLEncoding.DecodeString(splitted[0])
+	if err != nil {
+		return err
 	}
-}
+	var header JoseRegisteredHeader
+	if err = json.Unmarshal(decodedHeader, &header); err != nil {
+		return err
+	}
 
-func (j JWTPSS256) EncodeCompact(claims RegisteredClaims) (string, error) {
-	header := "{\"alg\":\"PS256\",\"typ\":\"JWT\"}"
-	payload, err := json.Marshal(claims)
+	decodedPayload, err := base64.RawURLEncoding.DecodeString(splitted[0])
 	if err != nil {
-		return "", err
+		return err
 	}
-	headerBase64 := base64.RawURLEncoding.EncodeToString([]byte(header))
-	payloadBase64 := base64.RawURLEncoding.EncodeToString(payload)
-	signatureStr := headerBase64 + "." + payloadBase64
-	hasher := crypto.SHA256.New()
-	_, err = hasher.Write([]byte(signatureStr))
-	if err != nil {
-		return "", err
-	}
-	signature, err := rsa.SignPSS(rand.Reader, j.key, crypto.SHA256, hasher.Sum(nil), &rsa.PSSOptions{
-		SaltLength: rsa.PSSSaltLengthEqualsHash,
-	})
-	if err != nil {
-		return "", err
-	}
-	signatureBase64 := base64.RawURLEncoding.EncodeToString(signature)
 
-	return headerBase64 + "." + payloadBase64 + "." + signatureBase64, nil
+	if header.Kid != nil {
+		return ErrKeyIDNotProvided
+	}
+
+	var (
+		valid bool
+	)
+
+	messageToVerify := splitted[0] + "." + splitted[1]
+	signature, err := base64.RawURLEncoding.DecodeString(splitted[2])
+	if err != nil {
+		return err
+	}
+
+	if strings.HasPrefix(header.Alg, "H") {
+		valid, err = kmsValue.VerifyMAC(ctx, *header.Kid, []byte(messageToVerify), signature)
+	} else {
+		valid, err = kmsValue.Verify(ctx, *header.Kid, []byte(messageToVerify), signature)
+	}
+
+	if err != nil {
+		return err
+	}
+	if !valid {
+		return ErrInvalidSignature
+	}
+
+	if err = json.Unmarshal(decodedPayload, payload); err != nil {
+		return err
+	}
+
+	return nil
 }
