@@ -18,48 +18,46 @@ var (
 	ErrInvalidSignature = errors.New("invalid signature")
 )
 
-func EncodeCompact(ctx context.Context, kmsValue kms.KMS, id string, claims interface{}) (string, error) {
+func EncodeCompact(ctx context.Context, kmsValue kms.KMS, id string, claims any) (string, error) {
 	key, err := kmsValue.Get(ctx, id)
 	if err != nil {
 		return "", err
 	}
-	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", key.KeySpec.Alg, id)
+	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", key.GetKeySpec().Alg, id)
 	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}
-	headerBase64 := base64.RawURLEncoding.EncodeToString([]byte(header))
-	payloadBase64 := base64.RawURLEncoding.EncodeToString(payload)
+	headerBase64 := encodePart([]byte(header))
+	payloadBase64 := encodePart(payload)
 	messageToSign := headerBase64 + "." + payloadBase64
-	var signature []byte
-	if strings.HasPrefix(key.KeySpec.Alg, "H") {
-		signature, err = kmsValue.GenerateMAC(ctx, id, []byte(messageToSign))
-	} else {
-		signature, err = kmsValue.Sign(ctx, id, []byte(messageToSign))
-	}
+
+	signature, err := kmsValue.Sign(ctx, id, []byte(messageToSign))
 	if err != nil {
 		return "", err
 	}
-	signatureBase64 := base64.RawURLEncoding.EncodeToString(signature)
+
+	signatureBase64 := encodePart(signature)
 	return messageToSign + "." + signatureBase64, nil
 }
 
 func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload any) error {
-	splitted := strings.Split(token, ".")
-	if len(splitted) != 3 {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
 		return ErrMalFormedJWT
 	}
 
-	decodedHeader, err := base64.RawURLEncoding.DecodeString(splitted[0])
+	decodedHeader, err := decodePart(parts[0])
 	if err != nil {
 		return err
 	}
+
 	var header JoseRegisteredHeader
 	if err = json.Unmarshal(decodedHeader, &header); err != nil {
 		return err
 	}
 
-	decodedPayload, err := base64.RawURLEncoding.DecodeString(splitted[0])
+	decodedPayload, err := decodePart(parts[0])
 	if err != nil {
 		return err
 	}
@@ -68,25 +66,18 @@ func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload 
 		return ErrKeyIDNotProvided
 	}
 
-	var (
-		valid bool
-	)
-
-	messageToVerify := splitted[0] + "." + splitted[1]
-	signature, err := base64.RawURLEncoding.DecodeString(splitted[2])
+	messageToVerify := parts[0] + "." + parts[1]
+	signature, err := decodePart(parts[2])
 	if err != nil {
 		return err
 	}
 
-	if strings.HasPrefix(header.Alg, "H") {
-		valid, err = kmsValue.VerifyMAC(ctx, *header.Kid, []byte(messageToVerify), signature)
-	} else {
-		valid, err = kmsValue.Verify(ctx, *header.Kid, []byte(messageToVerify), signature)
-	}
+	valid, err := kmsValue.Verify(ctx, *header.Kid, []byte(messageToVerify), signature)
 
 	if err != nil {
 		return err
 	}
+
 	if !valid {
 		return ErrInvalidSignature
 	}
@@ -96,4 +87,12 @@ func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload 
 	}
 
 	return nil
+}
+
+func encodePart(part []byte) string {
+	return base64.RawURLEncoding.EncodeToString(part)
+}
+
+func decodePart(part string) ([]byte, error) {
+	return base64.RawURLEncoding.DecodeString(part)
 }

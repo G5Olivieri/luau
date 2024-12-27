@@ -203,7 +203,6 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	// TODO: generate AccessToken, TokenType, ExpireIn, RefreshToken
 	response := TokenHandlerResponse{
 		TokenType:    "Bearer",
 		ExpiresIn:    h.accessTokenEncoder.ExpiresIn(),

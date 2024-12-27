@@ -11,6 +11,7 @@ import (
 
 	"github.com/G5Olivieri/luau/internal/client"
 	"github.com/G5Olivieri/luau/internal/csrf"
+	"github.com/G5Olivieri/luau/internal/jwk"
 	"github.com/G5Olivieri/luau/internal/kms"
 	"github.com/G5Olivieri/luau/internal/oidc"
 	"github.com/G5Olivieri/luau/internal/session"
@@ -102,33 +103,40 @@ func main() {
 	codeRepository := oidc.NewInMemoryCodeRepository(make(map[string]*oidc.Code), 5*time.Minute)
 
 	kmsvalue := kms.NewInMemoryKMS()
-	accessTokenKey, err := kmsvalue.GenerateKey(context.Background(), kms.KeySpec{
-		Alg:    "RS256",
-		Type:   "RSA",
-		Use:    "sig",
-		KeyOps: []string{"sign", "verify"},
+
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	accessTokenKey, err := kmsvalue.GenerateKey(timeoutContext, kms.KeySpec{
+		Alg:    jwk.KeyAlgRS256,
+		Type:   jwk.KeyTypeRSA,
+		Use:    jwk.KeyUseSig,
+		KeyOps: []jwk.KeyOps{jwk.KeyOpsSign, jwk.KeyOpsVerify},
 	})
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	refreshTokenKey, err := kmsvalue.GenerateKey(context.Background(), kms.KeySpec{
-		Alg:    "HS256",
-		Type:   "oct",
-		Use:    "sig",
-		KeyOps: []string{"sign", "verify"},
+	timeoutContext, cancel = context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	refreshTokenKey, err := kmsvalue.GenerateKey(timeoutContext, kms.KeySpec{
+		Alg:    jwk.KeyAlgHS256,
+		Type:   jwk.KeyTypeOct,
+		Use:    jwk.KeyUseSig,
+		KeyOps: []jwk.KeyOps{jwk.KeyOpsSign, jwk.KeyOpsVerify},
 	})
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	idTokenKey, err := kmsvalue.GenerateKey(context.Background(), kms.KeySpec{
-		Alg:    "ES256",
-		Type:   "EC",
-		Use:    "sig",
-		KeyOps: []string{"sign", "verify"},
+	timeoutContext, cancel = context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	idTokenKey, err := kmsvalue.GenerateKey(timeoutContext, kms.KeySpec{
+		Alg:    jwk.KeyAlgES256,
+		Type:   jwk.KeyTypeEC,
+		Use:    jwk.KeyUseSig,
+		KeyOps: []jwk.KeyOps{jwk.KeyOpsSign, jwk.KeyOpsVerify},
 	})
 
 	if err != nil {
@@ -136,9 +144,9 @@ func main() {
 	}
 
 	issuer := "https://luau.org"
-	idTokenJWTEncoder := oidc.NewIDTokenJWTEncoder(kmsvalue, issuer, 2*60*60, idTokenKey.ID)                // 2 hours
-	accessTokenEncoder := oidc.NewAccessTokenJWTEncoder(kmsvalue, issuer, 50*60, accessTokenKey.ID)         // 50 minutes
-	refreshTokenEncoder := oidc.NewRefreshTokenJWTEncoder(kmsvalue, issuer, 2*24*60*50, refreshTokenKey.ID) // 2 days
+	idTokenJWTEncoder := oidc.NewIDTokenJWTEncoder(kmsvalue, issuer, 2*60*60, idTokenKey.GetID())                // 2 hours
+	accessTokenEncoder := oidc.NewAccessTokenJWTEncoder(kmsvalue, issuer, 50*60, accessTokenKey.GetID())         // 50 minutes
+	refreshTokenEncoder := oidc.NewRefreshTokenJWTEncoder(kmsvalue, issuer, 2*24*60*50, refreshTokenKey.GetID()) // 2 days
 
 	authHandler := oidc.NewAuthHandler(clientRepository, httpSession, userRepository, csrfSync, codeRepository, *tmpl)
 	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, csrfSync, httpSession, codeRepository)
@@ -161,7 +169,7 @@ func main() {
 	r.POST("/oidc/login", NoCacheHandler(loginHandler.Handle))
 
 	r.GET("/oidc/.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		jwks, err := kmsvalue.JWKS()
+		jwks, err := kmsvalue.JWKSPublicKeys()
 		if err != nil {
 			log.Println(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
