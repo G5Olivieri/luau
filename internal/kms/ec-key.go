@@ -43,7 +43,7 @@ func (k *ECKey) GetPublicKey() ecdsa.PublicKey {
 }
 
 func (k *ECKey) Sign(message []byte) ([]byte, error) {
-	if !k.keySpec.HasOperation(KeyOpsSign) {
+	if !k.keySpec.HasOperation(jwk.KeyOpsSign) {
 		return nil, ErrInvalidKeyOperation
 	}
 
@@ -70,7 +70,7 @@ func (k *ECKey) Sign(message []byte) ([]byte, error) {
 }
 
 func (k *ECKey) Verify(message, signature []byte) (bool, error) {
-	if !k.keySpec.HasOperation(KeyOpsVerify) {
+	if !k.keySpec.HasOperation(jwk.KeyOpsVerify) {
 		return false, ErrInvalidKeyOperation
 	}
 
@@ -113,29 +113,17 @@ func (key *ECKey) JWKPublicKey() interface{} {
 	yBase64 := base64.RawURLEncoding.EncodeToString(yBytes)
 	keySpec := key.GetKeySpec()
 	kid := key.GetID()
-	alg := keySpec.Alg.String()
-	use := keySpec.Use.String()
 	return &ECJWK{
 		X:     xBase64,
 		Y:     yBase64,
 		Curve: publicKey.Params().Name,
 		JWK: jwk.JWK{
-			Kty: "EC",
-			Kid: &kid,
-			Use: &use,
-			Alg: &alg,
-			KeyOps: _map(keySpec.KeyOps, func(keyOps KeyOps) string {
-				return keyOps.String()
-			}),
+			Kty:    "EC",
+			Kid:    &kid,
+			Use:    &keySpec.Use,
+			Alg:    &keySpec.Alg,
+			KeyOps: keySpec.KeyOps,
 			// TODO: x5t, x5c, x5u, x5tS256
 		},
 	}
-}
-
-func _map[From any, To any](from []From, mapper func(From) To) []To {
-	mapped := make([]To, 0, len(from))
-	for _, element := range from {
-		mapped = append(mapped, mapper(element))
-	}
-	return mapped
 }

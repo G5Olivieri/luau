@@ -2,6 +2,8 @@ package kms
 
 import (
 	"crypto/hmac"
+
+	"github.com/G5Olivieri/luau/internal/jwk"
 )
 
 type HMACKey struct {
@@ -27,7 +29,7 @@ func (k *HMACKey) GetKeySpec() KeySpec {
 }
 
 func (k *HMACKey) Sign(message []byte) ([]byte, error) {
-	if !k.keySpec.HasOperation(KeyOpsSign) {
+	if !k.keySpec.HasOperation(jwk.KeyOpsSign) {
 		return nil, ErrInvalidKeyOperation
 	}
 	hasher, err := getHasherFromString(string(k.keySpec.Alg))
@@ -40,7 +42,7 @@ func (k *HMACKey) Sign(message []byte) ([]byte, error) {
 }
 
 func (k *HMACKey) Verify(message, signature []byte) (bool, error) {
-	if !k.keySpec.HasOperation(KeyOpsVerify) {
+	if !k.keySpec.HasOperation(jwk.KeyOpsVerify) {
 		return false, ErrInvalidKeyOperation
 	}
 

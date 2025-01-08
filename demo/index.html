@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <h1>Gen OAuth URL</h1>
+
+    <div id="url">
+
+    </div>
+
+    <div>
+        <button type="button" onclick="genURL()">Gen URL</button>
+    </div>
+
+    <div class="forms">
+        <div class="form-control">
+            <label for="host">
+                host
+            </label>
+            <input type="text" id="host" name="host">
+        </div>
+        <div class="form-control">
+            <label for="client_id">
+                client_id
+            </label>
+            <input type="text" id="client_id" name="client_id">
+        </div>
+        <div class="form-control">
+            <label for="redirect_uri">
+                redirect_uri
+            </label>
+            <input type="text" id="redirect_uri" name="redirect_uri">
+            <button type="button" onclick="fillLocation()">Fill location</button>
+        </div>
+        <div class="form-control">
+            <label for="response_type">
+                response_type
+            </label>
+            <select id="response_type" name="response_type">
+                <option value=""></option>
+                <option value="code">code</option>
+                <option value="id_token">id_token</option>
+                <option value="id_token token">id_token token</option>
+                <option value="code id_token">code id_token</option>
+                <option value="code token">code token</option>
+                <option value="code id_token token">code id_token token</option>
+            </select>
+        </div>
+
+        <div class="form-control">
+            <label for="scope">scope</label>
+            <input type="text" id="scope" name="scope">
+            <button type="button" onclick="fillOpenID()">openid</button>
+        </div>
+
+        <div class="form-control">
+            <label for="state">
+                state
+            </label>
+            <input type="text" id="state" name="state">
+            <button type="button" onclick="fillStateRandomUUID()">Random UUID</button>
+        </div>
+
+        <div class="form-control">
+            <label for="code_challenge_method">
+                code_challenge_method
+            </label>
+            <select id="code_challenge_method" name="code_challenge_method">
+                <option value=""></option>
+                <option value="plain">plain</option>
+                <option value="S256">S256</option>
+            </select>
+        </div>
+
+        <div class="form-control">
+            <label for="code_verifier">
+                code_verifier
+            </label>
+            <input type="text" id="code_verifier" name="code_verifier">
+            <button type="button" onclick="fillCodeVerifier()">Random</button>
+        </div>
+
+        <div class="form-control">
+            <label for="code_challenge">
+                code_challenge
+            </label>
+            <input type="text" id="code_challenge" name="code_challenge" disabled>
+        </div>
+
+        <div class="form-control">
+            <label for="nonce">
+                nonce
+            </label>
+            <input type="text" id="nonce" name="nonce">
+            <button type="button" onclick="fillNonceRandomUUID()">Random UUID</button>
+        </div>
+
+        <div class="form-control">
+            <label for="response_mode">
+                response_mode
+            </label>
+            <select id="response_mode" name="response_mode">
+                <option value=""></option>
+                <option value="query">query</option>
+                <option value="fragment">fragment</option>
+                <option value="form_post">form_post</option>
+            </select>
+        </div>
+
+        <div class="form-control">
+            <label for="display">
+                display
+            </label>
+            <select id="display" name="display">
+                <option value=""></option>
+                <option value="page">page</option>
+                <option value="popup">popup</option>
+                <option value="touch">touch</option>
+                <option value="wap">wap</option>
+            </select>
+        </div>
+
+        <div class="form-control">
+            <label for="prompt">
+                prompt
+            </label>
+            <select id="prompt" name="prompt">
+                <option value=""></option>
+                <option value="none">none</option>
+                <option value="login">login</option>
+                <option value="consent">consent</option>
+                <option value="select_account">select_account</option>
+            </select>
+        </div>
+
+        <div class="form-control">
+            <label for="max_age">
+                max_age
+            </label>
+            <input type="text" id="max_age" name="max_age">
+        </div>
+
+        <div class="form-control">
+            <label for="ui_locales">
+                ui_locales
+            </label>
+            <input type="text" id="ui_locales" name="ui_locales">
+        </div>
+
+        <div class="form-control">
+            <label for="id_token_hint">
+                id_token_hint
+            </label>
+            <textarea id="id_token_hint" name="id_token_hint"></textarea>
+        </div>
+
+        <div class="form-control">
+            <label for="login_hint">
+                login_hint
+            </label>
+            <input type="text" id="login_hint" name="login_hint">
+        </div>
+
+        <div class="form-control">
+            <label for="acr_values">
+                acr_values
+            </label>
+            <input type="text" id="acr_values" name="acr_values">
+        </div>
+    </div>
+    <script src="index.js"></script>
+</body>
+
+</html>

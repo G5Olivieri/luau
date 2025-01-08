@@ -20,6 +20,23 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+func CORSHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	origin := r.Header.Get("origin")
+	if origin != "" {
+		w.Header().Add("Access-Control-Allow-Origin", origin)
+		w.Header().Add("Access-Control-Allow-Methods", "POST")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Add("Access-Control-Max-Age", "86400")
+	}
+}
+
+func CORSHandlerMiddleware(h httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		CORSHandler(w, r, p)
+		h(w, r, p)
+	}
+}
+
 func NoCacheHandler(h httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		w.Header().Add("cache-control", "no-cache, no-store, must-revalidate")
@@ -92,7 +109,7 @@ func main() {
 	}
 	userRepository := user.NewInMemoryUserRepository(users)
 	clientRepository := client.NewInMemoryClientRepository([]client.Client{
-		{ID: "glayssinho", RawRedirectURI: "http://localhost:3000/callback"},
+		{ID: "glayssinho", RawRedirectURI: "http://localhost:3000/callback.html"},
 	})
 
 	sessionStore := session.NewInMemorySessionStore(make(map[string]*session.Session))
@@ -165,7 +182,7 @@ func main() {
 	r.GET("/oidc/auth", CSPHandler(authHandler.Handle))
 	r.POST("/oidc/auth", CSPHandler(authHandler.Handle))
 
-	r.POST("/oidc/token", NoCacheHandler(tokenHandler.Handle))
+	r.POST("/oidc/token", CORSHandlerMiddleware(NoCacheHandler(tokenHandler.Handle)))
 	r.POST("/oidc/login", NoCacheHandler(loginHandler.Handle))
 
 	r.GET("/oidc/.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
