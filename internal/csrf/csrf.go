@@ -45,7 +45,7 @@ func (s HMACDoubleSubmit) Generate(w http.ResponseWriter) (string, error) {
 }
 
 func (s HMACDoubleSubmit) Validate(value string, r *http.Request) (bool, error) {
-	cookieCsrfToken, err := r.Cookie("csrf")
+	cookieCsrfToken, err := r.Cookie(s.cookieName)
 
 	if err != nil {
 		return false, err
@@ -108,9 +108,5 @@ func (s *SynchronizerTokenPattern) Generate(sessionValue *session.Session) (stri
 }
 
 func (s *SynchronizerTokenPattern) Validate(value string, sessionValue *session.Session) (bool, error) {
-	if sessionValue.Data[s.csrfSessionName] != value {
-		return false, nil
-	}
-
-	return true, nil
+	return sessionValue.Data[s.csrfSessionName] == value, nil
 }
