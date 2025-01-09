@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package clients;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+import "client.proto";
+
+option go_package = "github.com/G5Olivieri/luau/clients";
+
+service ClientService {
+	rpc Create (CreateClientRequest) returns (Client) {}
+	rpc Update (Client) returns (Client) {}
+	rpc DeleteByID (google.protobuf.StringValue) returns (google.protobuf.Empty) {}
+	rpc GetByID (google.protobuf.StringValue) returns (Client) {}
+}
