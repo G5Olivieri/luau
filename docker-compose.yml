@@ -30,6 +30,31 @@ services:
       - ./clients:/app
       - gohome:/go
       - gocache:/root/.cache/go-build
+    healthcheck:
+      test: ["CMD", "sh", "-c", "netstat -ltn | grep -c 50051"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  locust:
+    build: ./load-testing
+    command: locust
+    working_dir: /app
+    volumes:
+      - ./load-testing:/app
+    ports:
+    - 8089:8089
+
+  ghz:
+    image: obvionaoe/ghz
+    depends_on:
+      - clients
+    command: -v
+    # command: --insecure --proto=/ghz/protos/services.proto --call=clients.ClientService.Create --data-file='/opt/ghz/new.json' clients:50051
+    volumes:
+      - ./clients/clients:/ghz/protos
+      - ./load-testing/new.json:/opt/ghz/new.json
 
   grpcox:
    image: gusaul/grpcox

@@ -35,6 +35,7 @@ type AuthRequest struct {
 	IDTokenHint         string
 	ACRValues           string
 	ResponseMode        string
+	Request             string
 }
 
 type AuthorizePage struct {
@@ -456,6 +457,11 @@ func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.
 		return AuthRequest{}, false
 	}
 
+	request, ok := getParamWithRedirect(w, r, "request", *redirectURI, q)
+	if !ok {
+		return AuthRequest{}, false
+	}
+
 	return AuthRequest{
 		ClientID:            clientID,
 		RedirectURI:         rawRedirectURI,
@@ -473,5 +479,6 @@ func (h AuthHandler) parseAndValidateAuthRequest(w http.ResponseWriter, r *http.
 		IDTokenHint:         idTokenHint,
 		ACRValues:           acrValues,
 		ResponseMode:        responseMode,
+		Request:             request,
 	}, true
 }

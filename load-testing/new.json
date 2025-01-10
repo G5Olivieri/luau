@@ -1,0 +1,73 @@
+{
+  "name": {
+    "default": "client #1"
+  },
+  "redirectUris": [
+    "http://localhost:3000"
+  ],
+  "responseTypes": [
+    "RESPONSE_TYPE_UNSPECIFIED"
+  ],
+  "grantTypes": [
+    "GRANT_TYPE_UNSPECIFIED"
+  ],
+  "defaultMaxAge": 0,
+  "contacts": [
+    ""
+  ],
+  "tokenEndpointAuthMethod": "TOKEN_ENDPOINT_AUTH_METHOD_UNSPECIFIED",
+  "applicationType": "APPLICATION_TYPE_UNSPECIFIED",
+  "logoUri": {
+    "": ""
+  },
+  "clientUri": {
+    "": ""
+  },
+  "policyUri": {
+    "": ""
+  },
+  "tosUri": {
+    "": ""
+  },
+  "jwksUri": "",
+  "jwks": [
+    {
+      "kty": "JWK_TYPE_UNSPECIFIED",
+      "use": "JWK_USE_UNSPECIFIED",
+      "alg": "JWK_ALG_UNSPECIFIED",
+      "keyOps": "JWT_KEY_OPS_UNSPECIFIED",
+      "kid": "",
+      "n": "",
+      "e": "",
+      "crv": "EC_CURVE_UNSPECIFIED",
+      "x": "",
+      "y": "",
+      "x5u": "",
+      "x5c": [
+        ""
+      ],
+      "x5t": "",
+      "x5tS256": ""
+    }
+  ],
+  "sectorIdentifierUri": "",
+  "subjectType": "SUBJECT_TYPE_UNSPECIFIED",
+  "idTokenSignedResponseAlg": "",
+  "idTokenEncryptedResponseAlg": "",
+  "idTokenEncryptedResponseEnc": "",
+  "userinfoSignedResponseAlg": "",
+  "userinfoEncryptedResponseAlg": "",
+  "userinfoEncryptedResponseEnc": "",
+  "requestObjectSigningAlg": "",
+  "requestObjectEncryptionAlg": "",
+  "requestObjectEncryptionEnc": "",
+  "tokenEndpointAuthSigningAlg": "",
+  "requireAuthTime": false,
+  "defaultAcrValues": [
+    ""
+  ],
+  "initiateLoginUri": "",
+  "requestUris": [
+    ""
+  ]
+}

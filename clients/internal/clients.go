@@ -26,4 +26,5 @@ type ClientsService interface {
 	Update(context.Context, *Client) (*Client, error)
 	DeleteByID(context.Context, *uuid.UUID) error
 	GetByID(context.Context, *uuid.UUID) (*Client, error)
+	List(context.Context, int, int) ([]*Client, error)
 }

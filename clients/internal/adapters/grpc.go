@@ -111,3 +111,24 @@ func (s *GRPCServer) GetByID(ctx context.Context, providedID *wrapperspb.StringV
 		RedirectUris: urisURLToStrings(client.RedirectURIs),
 	}, nil
 }
+
+func (s *GRPCServer) List(ctx context.Context, request *pb.LimitOffset) (*pb.Clients, error) {
+	clients, err := s.impl.List(ctx, int(request.GetLimit()), int(request.GetOffset()))
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "internal: %v", err)
+	}
+
+	responseClients := make([]*pb.Client, 0, len(clients))
+	for _, client := range clients {
+		responseClients = append(responseClients, &pb.Client{
+			ID:           client.ID.String(),
+			Name:         client.Name,
+			RedirectUris: urisURLToStrings(client.RedirectURIs),
+		})
+	}
+
+	return &pb.Clients{
+		Clients: responseClients,
+	}, nil
+}

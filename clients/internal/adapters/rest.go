@@ -37,6 +37,52 @@ type restAdapter struct {
 	impl internal.ClientsService
 }
 
+type limitOffset struct {
+	Limit  *int `form:"limit"`
+	Offset *int `form:"offset"`
+}
+
+// listClients godoc
+// @Summary list clients
+// @Schemes
+// @Description list clients
+// @Tags clients
+// @Accept json
+// @Produce json
+// @Param limit query int false "limit items (max: 1024)" default(256)
+// @Param offset query int false "offset items" default(0)
+// @Success 200 {array} []restClient
+// @Success 400
+// @Router / [get]
+func (a restAdapter) listClients(ctx *gin.Context) {
+	var query limitOffset
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if query.Limit == nil {
+		*query.Limit = 256
+	}
+
+	if query.Offset == nil {
+		*query.Offset = 0
+	}
+
+	clients, err := a.impl.List(ctx.Request.Context(), *query.Limit, *query.Offset)
+
+	if err != nil {
+		log.Println(err.Error())
+		ctx.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	response := make([]*restClient, 0, len(clients))
+	for _, v := range clients {
+		response = append(response, fromClient(v))
+	}
+	ctx.JSON(http.StatusOK, response)
+}
+
 // createClient godoc
 // @Summary create a client
 // @Schemes
@@ -199,6 +245,7 @@ func NewRestHTTPHandler(impl internal.ClientsService) http.Handler {
 	}
 
 	router.POST("/", adapter.createClient)
+	router.GET("/", adapter.listClients)
 	router.GET("/:id", adapter.getClientByID)
 	router.DELETE("/:id", adapter.deleteClientByID)
 	router.PUT("/:id", adapter.updateClient)

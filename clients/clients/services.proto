@@ -13,4 +13,14 @@ service ClientService {
 	rpc Update (Client) returns (Client) {}
 	rpc DeleteByID (google.protobuf.StringValue) returns (google.protobuf.Empty) {}
 	rpc GetByID (google.protobuf.StringValue) returns (Client) {}
+	rpc List (LimitOffset) returns (Clients) {}
+}
+
+message LimitOffset {
+	int32 limit = 1;
+	int32 offset = 2;
+}
+
+message Clients {
+	repeated Client clients = 1;
 }

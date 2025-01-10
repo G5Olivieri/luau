@@ -16,6 +16,52 @@ const docTemplate = `{
     "basePath": "{{.BasePath}}",
     "paths": {
         "/": {
+            "get": {
+                "description": "list clients",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clients"
+                ],
+                "summary": "list clients",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 256,
+                        "description": "limit items",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "offset items",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/adapters.restClient"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            },
             "post": {
                 "description": "create a client",
                 "consumes": [
