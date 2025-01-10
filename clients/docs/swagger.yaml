@@ -1,0 +1,140 @@
+definitions:
+  adapters.restClient:
+    properties:
+      id:
+        format: uuid
+        type: string
+      name:
+        additionalProperties:
+          type: string
+        example:
+          default: client
+          pt_BR: cliente
+        type: object
+      redirect_uris:
+        example:
+        - https://client-app.com/oauth/callback
+        items:
+          format: uri
+          type: string
+        type: array
+    type: object
+  adapters.restCreateOrUpdateClientRequest:
+    properties:
+      name:
+        additionalProperties:
+          type: string
+        example:
+          default: client
+          pt_BR: client
+        type: object
+      redirect_uris:
+        example:
+        - https://client-app.com/oauth/callback
+        items:
+          format: uri
+          type: string
+        type: array
+    type: object
+info:
+  contact: {}
+paths:
+  /:
+    post:
+      consumes:
+      - application/json
+      description: create a client
+      parameters:
+      - description: create client
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/adapters.restCreateOrUpdateClientRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/adapters.restClient'
+        "400":
+          description: Bad Request
+      summary: create a client
+      tags:
+      - clients
+  /{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete a client by id
+      parameters:
+      - description: client id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+      summary: delete client by id
+      tags:
+      - clients
+    get:
+      consumes:
+      - application/json
+      description: get a client by id
+      parameters:
+      - description: client id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/adapters.restClient'
+        "404":
+          description: Not Found
+      summary: get client by id
+      tags:
+      - clients
+    put:
+      consumes:
+      - application/json
+      description: update a client
+      parameters:
+      - description: client id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: update client
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/adapters.restCreateOrUpdateClientRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/adapters.restClient'
+        "404":
+          description: Not Found
+      summary: update client
+      tags:
+      - clients
+swagger: "2.0"

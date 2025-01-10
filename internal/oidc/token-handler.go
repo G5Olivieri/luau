@@ -107,7 +107,7 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 	}
 
 	// It doesn't allowed to use code twice
-	if err = h.codeRepository.Delete(r.Context(), *code); err != nil {
+	if err = h.codeRepository.Delete(r.Context(), code); err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return

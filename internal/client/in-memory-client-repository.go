@@ -2,24 +2,23 @@ package client
 
 import (
 	"context"
-	"fmt"
 )
 
 type InMemoryClientRepository struct {
-	clients []Client
+	clients []*Client
 }
 
-func NewInMemoryClientRepository(clients []Client) InMemoryClientRepository {
+func NewInMemoryClientRepository(clients []*Client) InMemoryClientRepository {
 	return InMemoryClientRepository{
 		clients: clients,
 	}
 }
 
-func (r InMemoryClientRepository) GetByID(ctx context.Context, id string) (Client, error) {
+func (r InMemoryClientRepository) GetByID(ctx context.Context, id string) (*Client, error) {
 	for _, c := range r.clients {
 		if c.ID == id {
 			return c, nil
 		}
 	}
-	return EmptyClient(), fmt.Errorf("Client not found")
+	return nil, ErrNotFound
 }

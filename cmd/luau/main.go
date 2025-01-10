@@ -18,6 +18,8 @@ import (
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func CORSHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -108,9 +110,12 @@ func main() {
 		LastLogin: 0,
 	}
 	userRepository := user.NewInMemoryUserRepository(users)
-	clientRepository := client.NewInMemoryClientRepository([]client.Client{
-		{ID: "glayssinho", RawRedirectURI: "http://localhost:3000/callback.html"},
-	})
+
+	addr := "localhost:50051"
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	defer conn.Close()
+
+	clientRepository := client.NewGRPCClientRepository(conn)
 
 	sessionStore := session.NewInMemorySessionStore(make(map[string]*session.Session))
 	httpSession := session.NewHttpSession(sessionStore, "session", 14*time.Hour)

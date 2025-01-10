@@ -11,9 +11,9 @@ import (
 )
 
 type CodeToCreate struct {
-	User                  user.User
+	User                  *user.User
 	RedirectURI           string
-	Client                client.Client
+	Client                *client.Client
 	Nonce                 *string
 	CodeChallenge         *string
 	CodeChallengeMethod   *string
@@ -22,8 +22,8 @@ type CodeToCreate struct {
 
 type Code struct {
 	ID                    string
-	User                  user.User
-	Client                client.Client
+	User                  *user.User
+	Client                *client.Client
 	RedirectURI           string
 	Nonce                 *string
 	CodeChallenge         *string
@@ -36,9 +36,9 @@ type Code struct {
 var ErrCodeNotFound = errors.New("code not found")
 
 type CodeRepository interface {
-	Create(context.Context, CodeToCreate) (*Code, error)
+	Create(context.Context, *CodeToCreate) (*Code, error)
 	GetByID(context.Context, string) (*Code, error)
-	Delete(context.Context, Code) error
+	Delete(context.Context, *Code) error
 }
 
 type InMemoryCodeRepository struct {
@@ -53,7 +53,7 @@ func NewInMemoryCodeRepository(codes map[string]*Code, expiresIn time.Duration) 
 	}
 }
 
-func (r *InMemoryCodeRepository) Create(ctx context.Context, toCreate CodeToCreate) (*Code, error) {
+func (r *InMemoryCodeRepository) Create(ctx context.Context, toCreate *CodeToCreate) (*Code, error) {
 	code := &Code{
 		ID:                    uuid.NewString(),
 		Client:                toCreate.Client,
@@ -77,7 +77,7 @@ func (r *InMemoryCodeRepository) GetByID(ctx context.Context, id string) (*Code,
 	return v, nil
 }
 
-func (r *InMemoryCodeRepository) Delete(ctx context.Context, code Code) error {
+func (r *InMemoryCodeRepository) Delete(ctx context.Context, code *Code) error {
 	delete(r.codes, code.ID)
 	return nil
 }

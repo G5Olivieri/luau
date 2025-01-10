@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"net/url"
 
 	"github.com/google/uuid"
 )
@@ -12,12 +13,12 @@ var ErrNotFound = errors.New("not found")
 type Client struct {
 	ID           uuid.UUID
 	Name         map[string]string
-	RedirectURIs []string
+	RedirectURIs []url.URL
 }
 
 type CreateClientRequest struct {
 	Name         map[string]string
-	RedirectURIs []string
+	RedirectURIs []url.URL
 }
 
 type ClientsService interface {

@@ -219,8 +219,8 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		}
 	}
 
-	code, err := h.codeRepository.Create(r.Context(), CodeToCreate{
-		User:                *userModel,
+	code, err := h.codeRepository.Create(r.Context(), &CodeToCreate{
+		User:                userModel,
 		Client:              clientModel,
 		RedirectURI:         rawRedirectURI,
 		Nonce:               nonce,

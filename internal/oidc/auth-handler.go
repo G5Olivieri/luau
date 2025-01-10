@@ -82,7 +82,7 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 
 	clientModel, err := h.clientRepository.GetByID(r.Context(), data.ClientID)
-	if errors.Is(err, client.NotFoundErr) {
+	if errors.Is(err, client.ErrNotFound) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -188,8 +188,8 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 		codeChallengeMethod = &data.CodeChallengeMethod
 	}
 
-	code, err := h.codeRepository.Create(r.Context(), CodeToCreate{
-		User:                *userModel,
+	code, err := h.codeRepository.Create(r.Context(), &CodeToCreate{
+		User:                userModel,
 		Client:              clientModel,
 		RedirectURI:         data.RedirectURI,
 		Nonce:               nonce,

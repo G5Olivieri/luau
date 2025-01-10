@@ -1,0 +1,41 @@
+services:
+  luau: &default-golang
+    image: golang:alpine
+    command: go run cmd/luau/main.go
+    working_dir: /app
+    ports:
+      - 8080:8080
+    volumes:
+      - .:/app
+      - gohome:/go
+      - gocache:/root/.cache/go-build
+
+  demo:
+    <<: *default-golang
+    command: go run demo.go
+    ports:
+      - 3000:3000
+    volumes:
+      - ./demo:/app
+      - gohome:/go
+      - gocache:/root/.cache/go-build
+
+  clients:
+    <<: *default-golang
+    command: go run cmd/server/main.go
+    ports:
+      - 50051:50051
+      - 50052:50052
+    volumes:
+      - ./clients:/app
+      - gohome:/go
+      - gocache:/root/.cache/go-build
+
+  grpcox:
+   image: gusaul/grpcox
+   ports:
+   - 6969:6969
+
+volumes:
+  gohome:
+  gocache:

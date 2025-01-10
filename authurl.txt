@@ -1,1 +1,0 @@
-http://localhost:8080/oidc/auth?client_id=glayssinho&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid&code_challenge=123&code_challenge_method=plain&nonce=123

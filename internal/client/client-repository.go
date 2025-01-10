@@ -5,10 +5,8 @@ import (
 	"errors"
 )
 
-var (
-	NotFoundErr = errors.New("NotFound")
-)
+var ErrNotFound = errors.New("not found")
 
 type ClientRepository interface {
-	GetByID(ctx context.Context, id string) (Client, error)
+	GetByID(ctx context.Context, id string) (*Client, error)
 }
