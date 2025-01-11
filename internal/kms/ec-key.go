@@ -3,18 +3,15 @@ package kms
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
+	"log"
 	"math/big"
 
-	"github.com/G5Olivieri/luau/internal/jwk"
+	"github.com/G5Olivieri/luau/jose/jwk"
 )
-
-type ECJWK struct {
-	jwk.JWK
-	Curve string `json:"crv"`
-	X     string `json:"x"`
-	Y     string `json:"y"`
-}
 
 type ECKey struct {
 	id         string
@@ -111,19 +108,40 @@ func (key *ECKey) JWKPublicKey() interface{} {
 	publicKey.Y.FillBytes(yBytes)
 	xBase64 := base64.RawURLEncoding.EncodeToString(xBytes)
 	yBase64 := base64.RawURLEncoding.EncodeToString(yBytes)
+
+	jwkValue := key.JWK()
+	jwkValue.X = &xBase64
+	jwkValue.Y = &yBase64
+	jwkValue.Curve = &publicKey.Params().Name
+
+	x5c, err := x509.MarshalPKIXPublicKey(&key.privateKey.PublicKey)
+
+	if err != nil {
+		log.Printf("error marshall x509 PKIX public key: %v", err)
+		return nil
+	}
+	jwkValue.X5c = []string{base64.StdEncoding.EncodeToString(x5c)}
+	x5t := sha1.Sum(x5c)
+	x5tBase64 := base64.RawURLEncoding.EncodeToString(x5t[:])
+	jwkValue.X5t = &x5tBase64
+
+	x5tS256 := sha256.Sum256(x5c)
+	x5tS256Base64 := base64.RawURLEncoding.EncodeToString(x5tS256[:])
+	jwkValue.X5tS256 = &x5tS256Base64
+
+	return &jwkValue
+}
+
+func (key *ECKey) JWK() jwk.JWK {
 	keySpec := key.GetKeySpec()
 	kid := key.GetID()
-	return &ECJWK{
-		X:     xBase64,
-		Y:     yBase64,
-		Curve: publicKey.Params().Name,
-		JWK: jwk.JWK{
-			Kty:    "EC",
-			Kid:    &kid,
-			Use:    &keySpec.Use,
-			Alg:    &keySpec.Alg,
-			KeyOps: keySpec.KeyOps,
-			// TODO: x5t, x5c, x5u, x5tS256
-		},
+
+	return jwk.JWK{
+		Kty:    "EC",
+		Kid:    &kid,
+		Use:    &keySpec.Use,
+		Alg:    &keySpec.Alg,
+		KeyOps: keySpec.KeyOps,
+		// TODO: x5t, x5c, x5u, x5tS256
 	}
 }

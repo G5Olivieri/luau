@@ -11,11 +11,12 @@ import (
 
 	"github.com/G5Olivieri/luau/internal/client"
 	"github.com/G5Olivieri/luau/internal/csrf"
-	"github.com/G5Olivieri/luau/internal/jwk"
 	"github.com/G5Olivieri/luau/internal/kms"
 	"github.com/G5Olivieri/luau/internal/oidc"
+	oidcencoding "github.com/G5Olivieri/luau/internal/oidc/encoding"
 	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/G5Olivieri/luau/jose/jwk"
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"google.golang.org/grpc"
@@ -27,7 +28,7 @@ func CORSHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if origin != "" {
 		w.Header().Add("Access-Control-Allow-Origin", origin)
 		w.Header().Add("Access-Control-Allow-Methods", "POST")
-		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type,x-requested-with")
 		w.Header().Add("Access-Control-Max-Age", "86400")
 	}
 }
@@ -111,8 +112,12 @@ func main() {
 	}
 	userRepository := user.NewInMemoryUserRepository(users)
 
-	addr := "localhost:50051"
+	// TODO: env vars
+	addr := "clients:50051"
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer conn.Close()
 
 	clientRepository := client.NewGRPCClientRepository(conn)
@@ -166,9 +171,9 @@ func main() {
 	}
 
 	issuer := "https://luau.org"
-	idTokenJWTEncoder := oidc.NewIDTokenJWTEncoder(kmsvalue, issuer, 2*60*60, idTokenKey.GetID())                // 2 hours
-	accessTokenEncoder := oidc.NewAccessTokenJWTEncoder(kmsvalue, issuer, 50*60, accessTokenKey.GetID())         // 50 minutes
-	refreshTokenEncoder := oidc.NewRefreshTokenJWTEncoder(kmsvalue, issuer, 2*24*60*50, refreshTokenKey.GetID()) // 2 days
+	idTokenJWTEncoder := oidcencoding.NewIDTokenJWTEncoder(kmsvalue, issuer, 2*60*60, idTokenKey.GetID())                // 2 hours
+	accessTokenEncoder := oidcencoding.NewAccessTokenJWTEncoder(kmsvalue, issuer, 50*60, accessTokenKey.GetID())         // 50 minutes
+	refreshTokenEncoder := oidcencoding.NewRefreshTokenJWTEncoder(kmsvalue, issuer, 2*24*60*50, refreshTokenKey.GetID()) // 2 days
 
 	authHandler := oidc.NewAuthHandler(clientRepository, httpSession, userRepository, csrfSync, codeRepository, *tmpl)
 	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, csrfSync, httpSession, codeRepository)
@@ -188,6 +193,7 @@ func main() {
 	r.POST("/oidc/auth", CSPHandler(authHandler.Handle))
 
 	r.POST("/oidc/token", CORSHandlerMiddleware(NoCacheHandler(tokenHandler.Handle)))
+	r.OPTIONS("/oidc/token", CORSHandler)
 	r.POST("/oidc/login", NoCacheHandler(loginHandler.Handle))
 
 	r.GET("/oidc/.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {

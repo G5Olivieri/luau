@@ -52,4 +52,13 @@ type JWK struct {
 	X5c     []string `json:"x5c,omitempty"`
 	X5t     *string  `json:"x5t,omitempty"`
 	X5tS256 *string  `json:"x5t#S256,omitempty"`
+
+	// RSA Public Key
+	E *string `json:"e,omitempty"`
+	N *string `json:"n,omitempty"`
+
+	// EC Public Key
+	Curve *string `json:"crv,omitempty"`
+	X     *string `json:"x,omitempty"`
+	Y     *string `json:"y,omitempty"`
 }

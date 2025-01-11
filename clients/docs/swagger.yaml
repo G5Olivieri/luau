@@ -26,7 +26,7 @@ definitions:
           type: string
         example:
           default: client
-          pt_BR: client
+          pt_BR: cliente
         type: object
       redirect_uris:
         example:
@@ -46,7 +46,7 @@ paths:
       description: list clients
       parameters:
       - default: 256
-        description: limit items
+        description: 'limit items (max: 1024)'
         in: query
         name: limit
         type: integer
@@ -68,6 +68,9 @@ paths:
             type: array
         "400":
           description: Bad Request
+      security:
+      - OAuth2Application:
+        - openid
       summary: list clients
       tags:
       - clients
@@ -91,6 +94,9 @@ paths:
             $ref: '#/definitions/adapters.restClient'
         "400":
           description: Bad Request
+      security:
+      - OAuth2Application:
+        - openid
       summary: create a client
       tags:
       - clients
@@ -113,6 +119,9 @@ paths:
           description: No Content
         "404":
           description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
       summary: delete client by id
       tags:
       - clients
@@ -136,6 +145,9 @@ paths:
             $ref: '#/definitions/adapters.restClient'
         "404":
           description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
       summary: get client by id
       tags:
       - clients
@@ -165,7 +177,18 @@ paths:
             $ref: '#/definitions/adapters.restClient'
         "404":
           description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
       summary: update client
       tags:
       - clients
+securityDefinitions:
+  OAuth2Application:
+    authorizationUrl: http://localhost:8080/oidc/auth
+    flow: accessCode
+    scopes:
+      openid: '"OpenID Connect scope"'
+    tokenUrl: http://localhost:8080/oidc/token
+    type: oauth2
 swagger: "2.0"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
 	"github.com/G5Olivieri/luau/internal/kms"
+	luaujwt "github.com/G5Olivieri/luau/jose/jwt"
 )
 
 type AccessTokenRequest struct {
@@ -52,15 +52,28 @@ func (e AccessTokenJWTEncoder) Encode(ctx context.Context, r AccessTokenRequest)
 		Iat:      now.Unix(),
 		Exp:      now.Add(time.Duration(e.expiresIn) * time.Second).Unix(),
 	}
-	return luaujwt.EncodeCompact(ctx, e.kms, e.keyID, payload)
+
+	signer, err := kms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
+
+	if err != nil {
+		return "", err
+	}
+
+	return luaujwt.EncodeCompact(ctx, signer, payload)
 }
 
 func (e AccessTokenJWTEncoder) Decode(ctx context.Context, jwtString string) (*AccessTokenPayload, error) {
 	var payload *AccessTokenPayload
-	err := luaujwt.DecodeCompact(ctx, e.kms, jwtString, payload)
+
+	verifier, err := kms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
+
+	if err = luaujwt.DecodeCompact(ctx, verifier, jwtString, payload); err != nil {
+		return nil, err
+	}
+
 	return payload, nil
 }
 

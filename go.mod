@@ -4,6 +4,7 @@ go 1.23.2
 
 require (
 	github.com/G5Olivieri/luau/clients v0.0.0-00010101000000-000000000000
+	github.com/G5Olivieri/luau/jose v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
 	golang.org/x/crypto v0.32.0
@@ -19,3 +20,5 @@ require (
 )
 
 replace github.com/G5Olivieri/luau/clients => ./clients
+
+replace github.com/G5Olivieri/luau/jose => ./jose

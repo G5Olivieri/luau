@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/G5Olivieri/luau/internal/client"
+	oidcencoding "github.com/G5Olivieri/luau/internal/oidc/encoding"
 	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/julienschmidt/httprouter"
@@ -27,9 +28,9 @@ type TokenHandler struct {
 	clientRepository    client.ClientRepository
 	codeRepository      CodeRepository
 	userRepository      user.UserRepository
-	idTokenJWTEncoder   IDTokenJWTEncoder
-	accessTokenEncoder  AccessTokenEncoder
-	refreshTokenEncoder RefreshTokenEncoder
+	idTokenJWTEncoder   oidcencoding.IDTokenJWTEncoder
+	accessTokenEncoder  oidcencoding.AccessTokenEncoder
+	refreshTokenEncoder oidcencoding.RefreshTokenEncoder
 	httpSession         session.HTTPSession
 }
 
@@ -38,9 +39,9 @@ func NewTokenHandler(
 	userRepository user.UserRepository,
 	codeRepository CodeRepository,
 	httpSession session.HTTPSession,
-	accessTokenEncoder AccessTokenEncoder,
-	refreshTokenEncoder RefreshTokenEncoder,
-	idTokenJWTEncoder IDTokenJWTEncoder,
+	accessTokenEncoder oidcencoding.AccessTokenEncoder,
+	refreshTokenEncoder oidcencoding.RefreshTokenEncoder,
+	idTokenJWTEncoder oidcencoding.IDTokenJWTEncoder,
 ) TokenHandler {
 	return TokenHandler{
 		clientRepository:    clientRepository,
@@ -167,7 +168,7 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	accessToken, err := h.accessTokenEncoder.Encode(r.Context(), AccessTokenRequest{
+	accessToken, err := h.accessTokenEncoder.Encode(r.Context(), oidcencoding.AccessTokenRequest{
 		Sub:      userModel.Username,
 		Audience: []string{clientID},
 	})
@@ -178,7 +179,7 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	refreshToken, err := h.refreshTokenEncoder.Encode(r.Context(), RefreshTokenRequest{
+	refreshToken, err := h.refreshTokenEncoder.Encode(r.Context(), oidcencoding.RefreshTokenRequest{
 		Sub:      userModel.Username,
 		Audience: []string{clientID},
 	})
@@ -189,7 +190,7 @@ func (h TokenHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	idToken, err := h.idTokenJWTEncoder.Encode(r.Context(), IDTokenRequest{
+	idToken, err := h.idTokenJWTEncoder.Encode(r.Context(), oidcencoding.IDTokenRequest{
 		Subject:  userModel.ID,
 		Audience: []string{code.Client.ID},
 		Nonce:    code.Nonce,

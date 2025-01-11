@@ -17,6 +17,13 @@ const docTemplate = `{
     "paths": {
         "/": {
             "get": {
+                "security": [
+                    {
+                        "OAuth2Application": [
+                            "openid"
+                        ]
+                    }
+                ],
                 "description": "list clients",
                 "consumes": [
                     "application/json"
@@ -32,7 +39,7 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "default": 256,
-                        "description": "limit items",
+                        "description": "limit items (max: 1024)",
                         "name": "limit",
                         "in": "query"
                     },
@@ -63,6 +70,13 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "OAuth2Application": [
+                            "openid"
+                        ]
+                    }
+                ],
                 "description": "create a client",
                 "consumes": [
                     "application/json"
@@ -100,6 +114,13 @@ const docTemplate = `{
         },
         "/{id}": {
             "get": {
+                "security": [
+                    {
+                        "OAuth2Application": [
+                            "openid"
+                        ]
+                    }
+                ],
                 "description": "get a client by id",
                 "consumes": [
                     "application/json"
@@ -134,6 +155,13 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "OAuth2Application": [
+                            "openid"
+                        ]
+                    }
+                ],
                 "description": "update a client",
                 "consumes": [
                     "application/json"
@@ -177,6 +205,13 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "OAuth2Application": [
+                            "openid"
+                        ]
+                    }
+                ],
                 "description": "delete a client by id",
                 "consumes": [
                     "application/json"
@@ -249,7 +284,7 @@ const docTemplate = `{
                     },
                     "example": {
                         "default": "client",
-                        "pt_BR": "client"
+                        "pt_BR": "cliente"
                     }
                 },
                 "redirect_uris": {
@@ -262,6 +297,17 @@ const docTemplate = `{
                         "https://client-app.com/oauth/callback"
                     ]
                 }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "OAuth2Application": {
+            "type": "oauth2",
+            "flow": "accessCode",
+            "authorizationUrl": "http://localhost:8080/oidc/auth",
+            "tokenUrl": "http://localhost:8080/oidc/token",
+            "scopes": {
+                "openid": "\"OpenID Connect scope\""
             }
         }
     }

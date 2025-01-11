@@ -3,7 +3,7 @@ package kms
 import (
 	"crypto/hmac"
 
-	"github.com/G5Olivieri/luau/internal/jwk"
+	"github.com/G5Olivieri/luau/jose/jwk"
 )
 
 type HMACKey struct {
@@ -54,4 +54,17 @@ func (k *HMACKey) Verify(message, signature []byte) (bool, error) {
 	mac.Write(message)
 	macValue := mac.Sum(nil)
 	return hmac.Equal(macValue, signature), nil
+}
+
+func (key *HMACKey) JWK() jwk.JWK {
+	keySpec := key.GetKeySpec()
+	kid := key.GetID()
+
+	return jwk.JWK{
+		Kty:    "oct",
+		Kid:    &kid,
+		Use:    &keySpec.Use,
+		Alg:    &keySpec.Alg,
+		KeyOps: keySpec.KeyOps,
+	}
 }

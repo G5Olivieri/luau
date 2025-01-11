@@ -3,6 +3,7 @@ module github.com/G5Olivieri/luau/clients
 go 1.23.2
 
 require (
+	github.com/G5Olivieri/luau/jose v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.10.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
@@ -51,3 +52,5 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
 )
+
+replace github.com/G5Olivieri/luau/jose => ../jose

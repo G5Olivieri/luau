@@ -9,7 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/G5Olivieri/luau/internal/kms"
+	"github.com/G5Olivieri/luau/jose"
+	"github.com/G5Olivieri/luau/jose/jwk"
 )
 
 var (
@@ -18,12 +19,18 @@ var (
 	ErrInvalidSignature = errors.New("invalid signature")
 )
 
-func EncodeCompact(ctx context.Context, kmsValue kms.KMS, id string, claims any) (string, error) {
-	key, err := kmsValue.Get(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", key.GetKeySpec().Alg, id)
+type Signer interface {
+	Sign(context.Context, []byte) ([]byte, error)
+	GetKeySpec() jwk.JWK
+}
+
+type Verifier interface {
+	Verify(context.Context, jose.JoseRegisteredHeader, []byte, []byte) (bool, error)
+}
+
+func EncodeCompact(ctx context.Context, signer Signer, claims any) (string, error) {
+	// TODO: verify more field in header
+	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", *signer.GetKeySpec().Alg, *signer.GetKeySpec().Kid)
 	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
@@ -32,7 +39,7 @@ func EncodeCompact(ctx context.Context, kmsValue kms.KMS, id string, claims any)
 	payloadBase64 := encodePart(payload)
 	messageToSign := headerBase64 + "." + payloadBase64
 
-	signature, err := kmsValue.Sign(ctx, id, []byte(messageToSign))
+	signature, err := signer.Sign(ctx, []byte(messageToSign))
 	if err != nil {
 		return "", err
 	}
@@ -41,7 +48,7 @@ func EncodeCompact(ctx context.Context, kmsValue kms.KMS, id string, claims any)
 	return messageToSign + "." + signatureBase64, nil
 }
 
-func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload any) error {
+func DecodeCompact(ctx context.Context, verifier Verifier, token string, payload any) error {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return ErrMalFormedJWT
@@ -52,7 +59,7 @@ func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload 
 		return err
 	}
 
-	var header JoseRegisteredHeader
+	var header jose.JoseRegisteredHeader
 	if err = json.Unmarshal(decodedHeader, &header); err != nil {
 		return err
 	}
@@ -62,7 +69,7 @@ func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload 
 		return err
 	}
 
-	if header.Kid != nil {
+	if header.Kid == nil {
 		return ErrKeyIDNotProvided
 	}
 
@@ -72,7 +79,7 @@ func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload 
 		return err
 	}
 
-	valid, err := kmsValue.Verify(ctx, *header.Kid, []byte(messageToVerify), signature)
+	valid, err := verifier.Verify(ctx, header, []byte(messageToVerify), signature)
 
 	if err != nil {
 		return err
@@ -87,6 +94,35 @@ func DecodeCompact(ctx context.Context, kmsValue kms.KMS, token string, payload 
 	}
 
 	return nil
+}
+
+func VerifySignatureCompact(ctx context.Context, verifier Verifier, token string) (bool, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false, ErrMalFormedJWT
+	}
+
+	decodedHeader, err := decodePart(parts[0])
+	if err != nil {
+		return false, err
+	}
+
+	var header jose.JoseRegisteredHeader
+	if err = json.Unmarshal(decodedHeader, &header); err != nil {
+		return false, err
+	}
+
+	if header.Kid == nil {
+		return false, ErrKeyIDNotProvided
+	}
+
+	messageToVerify := parts[0] + "." + parts[1]
+	signature, err := decodePart(parts[2])
+	if err != nil {
+		return false, err
+	}
+
+	return verifier.Verify(ctx, header, []byte(messageToVerify), signature)
 }
 
 func encodePart(part []byte) string {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/G5Olivieri/luau/internal/jwk"
+	"github.com/G5Olivieri/luau/jose/jwk"
 )
 
 var (
@@ -27,6 +27,7 @@ type KeySpec struct {
 type Key interface {
 	GetID() string
 	GetKeySpec() KeySpec
+	JWK() jwk.JWK
 }
 
 func (spec KeySpec) HasOperation(keyOps jwk.KeyOps) bool {

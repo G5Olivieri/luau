@@ -4,17 +4,15 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
+	"log"
 
-	"github.com/G5Olivieri/luau/internal/jwk"
+	"github.com/G5Olivieri/luau/jose/jwk"
 )
-
-type RSAJWK struct {
-	jwk.JWK
-	E string `json:"e"`
-	N string `json:"n"`
-}
 
 type RSAKey struct {
 	id         string
@@ -83,28 +81,14 @@ func (k *RSAKey) Verify(message, signature []byte) (bool, error) {
 
 	h := hasher.New()
 	h.Write(message)
-	err = rsa.VerifyPKCS1v15(&k.privateKey.PublicKey, hasher, h.Sum(nil), signature)
-	if err != nil {
-		return false, err
+	switch k.keySpec.Alg {
+	case jwk.KeyAlgRS256, jwk.KeyAlgRS384, jwk.KeyAlgRS512:
+		err = rsa.VerifyPKCS1v15(&k.privateKey.PublicKey, hasher, h.Sum(nil), signature)
+	case jwk.KeyAlgPS256, jwk.KeyAlgPS384, jwk.KeyAlgPS512:
+		err = rsa.VerifyPSS(&k.privateKey.PublicKey, hasher, h.Sum(nil), signature, &rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthAuto,
+		})
 	}
-
-	return true, nil
-}
-
-func (k *RSAKey) VerifyPSS(message, signature []byte) (bool, error) {
-	if !k.keySpec.HasOperation(jwk.KeyOpsVerify) {
-		return false, ErrInvalidKeyOperation
-	}
-	hasher, err := getHasherFromString(string(k.keySpec.Alg))
-	if err != nil {
-		return false, err
-	}
-
-	h := hasher.New()
-	h.Write(message)
-	err = rsa.VerifyPSS(&k.privateKey.PublicKey, hasher, h.Sum(nil), signature, &rsa.PSSOptions{
-		SaltLength: rsa.PSSSaltLengthAuto,
-	})
 
 	if err != nil {
 		return false, err
@@ -123,17 +107,36 @@ func (key *RSAKey) JWKPublicKey() interface{} {
 	eBase64 := base64.RawURLEncoding.EncodeToString(bytes.TrimLeft(eBytes, "\x00"))
 	nBase64 := base64.RawURLEncoding.EncodeToString(nBytes)
 
+	jwkValue := key.JWK()
+	jwkValue.E = &eBase64
+	jwkValue.N = &nBase64
+
+	x5c, err := x509.MarshalPKIXPublicKey(&key.privateKey.PublicKey)
+
+	if err != nil {
+		log.Printf("error marshall x509 PKIX public key: %v", err)
+		return nil
+	}
+	jwkValue.X5c = []string{base64.StdEncoding.EncodeToString(x5c)}
+	x5t := sha1.Sum(x5c)
+	x5tBase64 := base64.RawURLEncoding.EncodeToString(x5t[:])
+	jwkValue.X5t = &x5tBase64
+
+	x5tS256 := sha256.Sum256(x5c)
+	x5tS256Base64 := base64.RawURLEncoding.EncodeToString(x5tS256[:])
+	jwkValue.X5tS256 = &x5tS256Base64
+	return &jwkValue
+}
+
+func (key *RSAKey) JWK() jwk.JWK {
 	keySpec := key.GetKeySpec()
 	kid := key.GetID()
-	return &RSAJWK{
-		E: eBase64,
-		N: nBase64,
-		JWK: jwk.JWK{
-			Kty:    "RSA",
-			Kid:    &kid,
-			Use:    &keySpec.Use,
-			Alg:    &keySpec.Alg,
-			KeyOps: keySpec.KeyOps,
-		},
+	return jwk.JWK{
+		Kty:    "RSA",
+		Kid:    &kid,
+		Use:    &keySpec.Use,
+		Alg:    &keySpec.Alg,
+		KeyOps: keySpec.KeyOps,
+		// TODO: x5t, x5c, x5u, x5tS256
 	}
 }

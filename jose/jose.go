@@ -1,10 +1,9 @@
-// https://www.rfc-editor.org/rfc/rfc7515.html
-package jwt
+package jose
 
 import (
 	"net/url"
 
-	"github.com/G5Olivieri/luau/internal/jwk"
+	"github.com/G5Olivieri/luau/jose/jwk"
 )
 
 type JoseRegisteredHeader struct {

@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"errors"
-	"net/url"
 	"sync"
 
 	"github.com/google/uuid"
@@ -116,11 +115,3 @@ func (s *InMemoryClientsService) List(_ context.Context, limit int, offset int) 
 
 	return response, nil
 }
-
-type AuthenticationRequest struct {
-	ID          uuid.UUID
-	RedirectURI url.URL
-	Request     string
-}
-
-func (s *InMemoryClientsService) AuthenticationRequest(_ context.Context)

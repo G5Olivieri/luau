@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	docs "github.com/G5Olivieri/luau/clients/docs"
 	"github.com/G5Olivieri/luau/clients/internal"
+	"github.com/G5Olivieri/luau/jose/jwt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	swaggerfiles "github.com/swaggo/files"
@@ -21,7 +23,7 @@ type restClient struct {
 }
 
 type restCreateOrUpdateClientRequest struct {
-	Name         map[string]string `json:"name" example:"default:client,pt_BR:client"`
+	Name         map[string]string `json:"name" example:"default:client,pt_BR:cliente"`
 	RedirectURIs []string          `json:"redirect_uris" swaggertype:"array,string" format:"uri" example:"https://client-app.com/oauth/callback"`
 }
 
@@ -43,6 +45,7 @@ type limitOffset struct {
 }
 
 // listClients godoc
+// @Security OAuth2Application[openid]
 // @Summary list clients
 // @Schemes
 // @Description list clients
@@ -69,11 +72,11 @@ func (a restAdapter) listClients(ctx *gin.Context) {
 		*query.Offset = 0
 	}
 
-	clients, err := a.impl.List(ctx.Request.Context(), *query.Limit, *query.Offset)
+	clients, err := a.impl.List(ctx, *query.Limit, *query.Offset)
 
 	if err != nil {
 		log.Println(err.Error())
-		ctx.Writer.WriteHeader(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	response := make([]*restClient, 0, len(clients))
@@ -84,6 +87,7 @@ func (a restAdapter) listClients(ctx *gin.Context) {
 }
 
 // createClient godoc
+// @Security OAuth2Application[openid]
 // @Summary create a client
 // @Schemes
 // @Description create a client
@@ -107,13 +111,13 @@ func (a restAdapter) createClient(ctx *gin.Context) {
 		return
 	}
 
-	clientCreated, err := a.impl.Create(ctx.Request.Context(), &internal.CreateClientRequest{
+	clientCreated, err := a.impl.Create(ctx, &internal.CreateClientRequest{
 		Name:         createRequest.Name,
 		RedirectURIs: urls,
 	})
 	if err != nil {
 		log.Printf("internal server error: %v", err)
-		ctx.Writer.WriteHeader(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -123,6 +127,7 @@ func (a restAdapter) createClient(ctx *gin.Context) {
 }
 
 // getClientByID godoc
+// @Security OAuth2Application[openid]
 // @Summary get client by id
 // @Schemes
 // @Description get a client by id
@@ -141,22 +146,22 @@ func (a restAdapter) getClientByID(ctx *gin.Context) {
 		return
 	}
 
-	client, err := a.impl.GetByID(ctx.Request.Context(), &id)
+	client, err := a.impl.GetByID(ctx, &id)
 	if err != nil {
 		if errors.Is(err, internal.ErrNotFound) {
-			ctx.Writer.WriteHeader(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 		} else {
 			log.Printf("Internal server error: %v", err)
-			ctx.Writer.WriteHeader(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 		}
 		return
 	}
 
 	ctx.JSON(http.StatusOK, fromClient(client))
-
 }
 
 // deleteClientByID godoc
+// @Security OAuth2Application[openid]
 // @Summary delete client by id
 // @Schemes
 // @Description delete a client by id
@@ -174,20 +179,20 @@ func (a restAdapter) deleteClientByID(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err = a.impl.DeleteByID(ctx.Request.Context(), &id); err != nil {
+	if err = a.impl.DeleteByID(ctx, &id); err != nil {
 		if errors.Is(err, internal.ErrNotFound) {
-			ctx.Writer.WriteHeader(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 		} else {
 			log.Printf("Internal server error: %v", err)
-			ctx.Writer.WriteHeader(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 		}
 		return
 	}
-	ctx.Writer.WriteHeader(http.StatusNoContent)
-
+	ctx.Status(http.StatusNoContent)
 }
 
 // updateClient godoc
+// @Security OAuth2Application[openid]
 // @Summary update client
 // @Schemes
 // @Description update a client
@@ -220,23 +225,78 @@ func (a restAdapter) updateClient(ctx *gin.Context) {
 		return
 	}
 
-	clientUpdate, err := a.impl.Update(ctx.Request.Context(), &internal.Client{
+	clientUpdate, err := a.impl.Update(ctx, &internal.Client{
 		ID:           id,
 		Name:         updateRequest.Name,
 		RedirectURIs: urls,
 	})
 	if err != nil {
 		if errors.Is(err, internal.ErrNotFound) {
-			ctx.Writer.WriteHeader(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 			return
 		}
 		log.Printf("internal server error: %v", err)
-		ctx.Writer.WriteHeader(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	ctx.JSON(http.StatusOK, fromClient(clientUpdate))
 }
 
+func authMiddleware(ctx *gin.Context) {
+	authorization := ctx.GetHeader("authorization")
+	if authorization == "" {
+		log.Println("authorization is empty")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	splited := strings.Split(authorization, " ")
+	if len(splited) != 2 {
+		log.Println("invalid authorization")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	if splited[0] != "Bearer" {
+		log.Println("scheme is not Bearer")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	token := splited[1]
+
+	// TODO: decode JWT, Get Public Key at JWKS, Validate signature, issuer, aud, exp
+	if token == "" {
+		log.Println("token is empty")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// TODO: get from env
+	verifier, err := NewJWKSVerifierFromUri(ctx, "http://luau:8080/oidc/.well-known/jwks.json")
+	if err != nil {
+		log.Println(err)
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	valid, err := jwt.VerifySignatureCompact(ctx, verifier, token)
+
+	if err != nil {
+		log.Println(err)
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	if !valid {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+	}
+}
+
+// @securitydefinitions.oauth2.accessCode OAuth2Application
+// @authorizationUrl http://localhost:8080/oidc/auth
+// @tokenUrl http://localhost:8080/oidc/token
+// @scope.openid "OpenID Connect scope"
 func NewRestHTTPHandler(impl internal.ClientsService) http.Handler {
 	router := gin.Default()
 
@@ -244,17 +304,21 @@ func NewRestHTTPHandler(impl internal.ClientsService) http.Handler {
 		impl: impl,
 	}
 
-	router.POST("/", adapter.createClient)
-	router.GET("/", adapter.listClients)
-	router.GET("/:id", adapter.getClientByID)
-	router.DELETE("/:id", adapter.deleteClientByID)
-	router.PUT("/:id", adapter.updateClient)
+	router.Use()
+
+	apiRouter := router.Group("/api", authMiddleware)
+
+	apiRouter.POST("/", adapter.createClient)
+	apiRouter.GET("/", adapter.listClients)
+	apiRouter.GET("/:id", adapter.getClientByID)
+	apiRouter.DELETE("/:id", adapter.deleteClientByID)
+	apiRouter.PUT("/:id", adapter.updateClient)
 
 	docs.SwaggerInfo.Title = "Client API"
 	docs.SwaggerInfo.Description = "This is a client API"
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = ""
-	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.BasePath = "/api"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))

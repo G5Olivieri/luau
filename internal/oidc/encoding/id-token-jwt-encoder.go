@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	luaujwt "github.com/G5Olivieri/luau/internal/jwt"
+	luaujwt "github.com/G5Olivieri/luau/jose/jwt"
 
 	"github.com/G5Olivieri/luau/internal/kms"
 )
@@ -75,13 +75,26 @@ func (e IDTokenJWTEncoderImpl) Encode(ctx context.Context, r IDTokenRequest) (st
 		// TODO: acr, azp, AtHash
 	}
 
-	return luaujwt.EncodeCompact(ctx, e.kms, e.keyID, idToken)
+	signer, err := kms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
+
+	if err != nil {
+		return "", err
+	}
+
+	return luaujwt.EncodeCompact(ctx, signer, idToken)
 }
 
 func (e IDTokenJWTEncoderImpl) Decode(ctx context.Context, jwtString string) (*IDToken, error) {
 	var payload *IDToken
-	if err := luaujwt.DecodeCompact(ctx, e.kms, jwtString, payload); err != nil {
+
+	verifier, err := kms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
+	if err != nil {
 		return nil, err
 	}
+
+	if err = luaujwt.DecodeCompact(ctx, verifier, jwtString, payload); err != nil {
+		return nil, err
+	}
+
 	return payload, nil
 }

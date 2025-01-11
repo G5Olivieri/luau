@@ -1,35 +1,40 @@
 services:
-  luau: &default-golang
+  luau:
     image: golang:alpine
-    command: go run cmd/luau/main.go
     working_dir: /app
+    depends_on:
+      - clients
+    command: go run cmd/luau/main.go
     ports:
       - 8080:8080
     volumes:
+      - "gohome:/go"
+      - "gocache:/root/.cache/go-build"
       - .:/app
-      - gohome:/go
-      - gocache:/root/.cache/go-build
 
   demo:
-    <<: *default-golang
+    image: golang:alpine
+    working_dir: /app
     command: go run demo.go
     ports:
       - 3000:3000
     volumes:
+      - "gohome:/go"
+      - "gocache:/root/.cache/go-build"
       - ./demo:/app
-      - gohome:/go
-      - gocache:/root/.cache/go-build
 
   clients:
-    <<: *default-golang
+    image: golang:alpine
+    working_dir: /app/clients
     command: go run cmd/server/main.go
     ports:
       - 50051:50051
       - 50052:50052
     volumes:
-      - ./clients:/app
-      - gohome:/go
-      - gocache:/root/.cache/go-build
+      - "gohome:/go"
+      - "gocache:/root/.cache/go-build"
+      - .:/app
+
     healthcheck:
       test: ["CMD", "sh", "-c", "netstat -ltn | grep -c 50051"]
       interval: 5s
@@ -37,24 +42,23 @@ services:
       retries: 5
       start_period: 30s
 
-  locust:
-    build: ./load-testing
-    command: locust
-    working_dir: /app
-    volumes:
-      - ./load-testing:/app
-    ports:
-    - 8089:8089
+  # locust:
+  #   build: ./load-testing
+  #   command: locust
+  #   working_dir: /app
+  #   volumes:
+  #     - ./load-testing:/app
+  #   ports:
+  #   - 8089:8089
 
-  ghz:
-    image: obvionaoe/ghz
-    depends_on:
-      - clients
-    command: -v
-    # command: --insecure --proto=/ghz/protos/services.proto --call=clients.ClientService.Create --data-file='/opt/ghz/new.json' clients:50051
-    volumes:
-      - ./clients/clients:/ghz/protos
-      - ./load-testing/new.json:/opt/ghz/new.json
+  # ghz:
+  #   image: obvionaoe/ghz
+  #   depends_on:
+  #     - clients
+  #   command: --insecure --proto=/ghz/protos/services.proto --call=clients.ClientService.Create --data-file='/opt/ghz/new.json' clients:50051
+  #   volumes:
+  #     - ./clients/clients:/ghz/protos
+  #     - ./load-testing/new.json:/opt/ghz/new.json
 
   grpcox:
    image: gusaul/grpcox
