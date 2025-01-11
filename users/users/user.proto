@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package users;
+
+option go_package = "github.com/G5Olivieri/luau/users";
+
+message CreateUserRequest {
+  string username = 2;
+  string password = 3;
+	int64 last_login = 4;
+}
+
+message User {
+  string ID = 1;
+  string username = 2;
+  string password = 3;
+	int64 last_login = 4;
+}

@@ -65,10 +65,12 @@ func (a restAdapter) listClients(ctx *gin.Context) {
 	}
 
 	if query.Limit == nil {
+		query.Limit = new(int)
 		*query.Limit = 256
 	}
 
 	if query.Offset == nil {
+		query.Offset = new(int)
 		*query.Offset = 0
 	}
 

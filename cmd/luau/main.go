@@ -17,7 +17,6 @@ import (
 	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/user"
 	"github.com/G5Olivieri/luau/jose/jwk"
-	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -92,35 +91,23 @@ func main() {
 		return
 	}
 
-	// https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
-	// The 32-sized ouput can be used as AES-256 key
-	hasher := user.NewArgon2PasswordHasher(1, 46*1024, 1, 32)
-	password, err := user.NewHashSaltPassword([]byte("glayson"), salt, hasher)
-	if err != nil {
-		log.Println("new password error")
-		log.Fatalln(err.Error())
-		return
-	}
-
-	userID := uuid.NewString()
-	users := make(map[string]*user.User)
-	users[userID] = &user.User{
-		ID:        userID,
-		Username:  "glayson",
-		Password:  password,
-		LastLogin: 0,
-	}
-	userRepository := user.NewInMemoryUserRepository(users)
-
 	// TODO: env vars
 	addr := "clients:50051"
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	clientConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	defer clientConn.Close()
 
-	clientRepository := client.NewGRPCClientRepository(conn)
+	clientRepository := client.NewGRPCClientRepository(clientConn)
+
+	addr = "users:50053"
+	userConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer clientConn.Close()
+	userRepository := user.NewGRPCUserRepository(userConn)
 
 	sessionStore := session.NewInMemorySessionStore(make(map[string]*session.Session))
 	httpSession := session.NewHttpSession(sessionStore, "session", 14*time.Hour)

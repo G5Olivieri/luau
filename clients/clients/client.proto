@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package clients;
 
-import "jwk.proto";
+import "jose/jwk.proto";
 
 option go_package = "github.com/G5Olivieri/luau/clients";
 
@@ -58,7 +58,7 @@ message CreateClientRequest {
   map<string, string> policy_uri = 11;
   map<string, string> tos_uri = 12;
   string jwks_uri = 13;
-  repeated JWK jwks = 14;
+  repeated jose.JWK jwks = 14;
   string sector_identifier_uri = 15;
   SubjectType subject_type = 16;
   string id_token_signed_response_alg = 17;
@@ -92,7 +92,7 @@ message Client {
   map<string, string> policy_uri = 12;
   map<string, string> tos_uri = 13;
   string jwks_uri = 14;
-  repeated JWK jwks = 15;
+  repeated jose.JWK jwks = 15;
   string sector_identifier_uri = 16;
   SubjectType subject_type = 17;
   string id_token_signed_response_alg = 18;

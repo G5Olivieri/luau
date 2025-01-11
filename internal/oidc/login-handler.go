@@ -161,7 +161,7 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	userModel, err := h.userRepository.GetByUsername(r.Context(), username)
+	userModel, err := h.userRepository.GetByUsernamePassword(r.Context(), username, password)
 
 	if err != nil {
 		log.Println("User not found")
@@ -169,16 +169,10 @@ func (h LoginHandler) Handle(w http.ResponseWriter, r *http.Request, _ httproute
 		return
 	}
 
-	if !userModel.CheckPassword([]byte(password)) {
-		log.Println("Invalid password")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	sessionValue.Data["userId"] = userModel.ID
 	userModel.LastLogin = time.Now().Unix()
 
-	if err = h.userRepository.Save(r.Context(), *userModel); err != nil {
+	if _, err = h.userRepository.Update(r.Context(), userModel); err != nil {
 		log.Println(err.Error())
 		q.Set("error", "server_error")
 		q.Set("error_description", "internal server error")

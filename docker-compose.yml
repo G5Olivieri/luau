@@ -35,6 +35,19 @@ services:
       - "gocache:/root/.cache/go-build"
       - .:/app
 
+  users:
+    image: golang:alpine
+    working_dir: /app/users
+    command: go run cmd/server/main.go
+    ports:
+      - 50053:50053
+      - 50054:50054
+    volumes:
+      - "gohome:/go"
+      - "gocache:/root/.cache/go-build"
+      - .:/app
+
+
     healthcheck:
       test: ["CMD", "sh", "-c", "netstat -ltn | grep -c 50051"]
       interval: 5s
