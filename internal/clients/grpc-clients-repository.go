@@ -1,4 +1,4 @@
-package client
+package clients
 
 import (
 	"context"
@@ -10,18 +10,18 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-type GRPCClientRepository struct {
+type GRPCClientsRepository struct {
 	grpcClient pb.ClientServiceClient
 }
 
-func NewGRPCClientRepository(conn *grpc.ClientConn) *GRPCClientRepository {
+func NewGRPCClientsRepository(conn *grpc.ClientConn) *GRPCClientsRepository {
 	clientServiceClient := pb.NewClientServiceClient(conn)
-	return &GRPCClientRepository{
+	return &GRPCClientsRepository{
 		grpcClient: clientServiceClient,
 	}
 }
 
-func (r *GRPCClientRepository) GetByID(ctx context.Context, id string) (*Client, error) {
+func (r *GRPCClientsRepository) GetByID(ctx context.Context, id string) (*Client, error) {
 	client, err := r.grpcClient.GetByID(ctx, &wrapperspb.StringValue{Value: id})
 
 	if err != nil {

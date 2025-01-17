@@ -11,6 +11,8 @@ require (
 	google.golang.org/protobuf v1.36.2
 )
 
+require golang.org/x/sync v0.10.0 // indirect
+
 require (
 	github.com/G5Olivieri/luau/users v0.0.0-00010101000000-000000000000
 	golang.org/x/net v0.34.0 // indirect

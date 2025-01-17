@@ -1,0 +1,6 @@
+{
+    "name": {
+        "default": "Client #1"
+    },
+    "redirect_uris": ["http://localhost:3000/callback.html"]
+}

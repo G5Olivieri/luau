@@ -9,24 +9,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/clients"
 	"github.com/G5Olivieri/luau/internal/csrf"
 	"github.com/G5Olivieri/luau/internal/session"
-	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/G5Olivieri/luau/internal/users"
 	"github.com/julienschmidt/httprouter"
 )
 
 type LoginHandler struct {
-	clientRepository client.ClientRepository
-	userRepository   user.UserRepository
+	clientRepository clients.ClientsRepository
+	userRepository   users.UsersRepository
 	csrfSync         *csrf.SynchronizerTokenPattern
 	httpSession      session.HTTPSession
 	codeRepository   CodeRepository
 }
 
 func NewLoginHandler(
-	clientRepository client.ClientRepository,
-	userRepository user.UserRepository,
+	clientRepository clients.ClientsRepository,
+	userRepository users.UsersRepository,
 	csrfSync *csrf.SynchronizerTokenPattern,
 	httpSession session.HTTPSession,
 	codeRepository CodeRepository,

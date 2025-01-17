@@ -11,10 +11,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/clients"
 	"github.com/G5Olivieri/luau/internal/csrf"
 	"github.com/G5Olivieri/luau/internal/session"
-	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/G5Olivieri/luau/internal/users"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -49,24 +49,24 @@ type AuthorizePage struct {
 }
 
 type AuthHandler struct {
-	clientRepository client.ClientRepository
+	clientRepository clients.ClientsRepository
 	httpSession      session.HTTPSession
 	csrfSync         *csrf.SynchronizerTokenPattern
-	userRepository   user.UserRepository
+	userRepository   users.UsersRepository
 	codeRepository   CodeRepository
 	tmpl             template.Template
 }
 
 func NewAuthHandler(
-	clientRepository client.ClientRepository,
+	clientsRepository clients.ClientsRepository,
 	httpSession session.HTTPSession,
-	userRepository user.UserRepository,
+	userRepository users.UsersRepository,
 	csrfSync *csrf.SynchronizerTokenPattern,
 	codeRepository CodeRepository,
 	tmpl template.Template,
 ) AuthHandler {
 	return AuthHandler{
-		clientRepository: clientRepository,
+		clientRepository: clientsRepository,
 		csrfSync:         csrfSync,
 		httpSession:      httpSession,
 		userRepository:   userRepository,
@@ -83,7 +83,7 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 
 	clientModel, err := h.clientRepository.GetByID(r.Context(), data.ClientID)
-	if errors.Is(err, client.ErrNotFound) {
+	if errors.Is(err, clients.ErrNotFound) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -160,7 +160,7 @@ func (h AuthHandler) Handle(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 
 	userModel, err := h.userRepository.GetByID(r.Context(), userID)
-	if errors.Is(err, user.ErrNotFound) {
+	if errors.Is(err, users.ErrNotFound) {
 		log.Println("UserID in session not found")
 		w.WriteHeader(http.StatusNotFound)
 		return

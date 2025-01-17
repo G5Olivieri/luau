@@ -1,4 +1,4 @@
-package client
+package clients
 
 import (
 	"context"
@@ -7,6 +7,6 @@ import (
 
 var ErrNotFound = errors.New("not found")
 
-type ClientRepository interface {
+type ClientsRepository interface {
 	GetByID(ctx context.Context, id string) (*Client, error)
 }

@@ -1,4 +1,4 @@
-package user
+package users
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 var ErrNotFound = errors.New("user not found")
 
-type UserRepository interface {
+type UsersRepository interface {
 	GetByUsername(context.Context, string) (*User, error)
 	GetByUsernamePassword(context.Context, string, string) (*User, error)
 	GetByID(context.Context, string) (*User, error)

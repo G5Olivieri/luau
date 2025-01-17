@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/clients"
 	oidcencoding "github.com/G5Olivieri/luau/internal/oidc/encoding"
 	"github.com/G5Olivieri/luau/internal/session"
-	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/G5Olivieri/luau/internal/users"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -25,9 +25,9 @@ type TokenHandlerResponse struct {
 }
 
 type TokenHandler struct {
-	clientRepository    client.ClientRepository
+	clientRepository    clients.ClientsRepository
 	codeRepository      CodeRepository
-	userRepository      user.UserRepository
+	userRepository      users.UsersRepository
 	idTokenJWTEncoder   oidcencoding.IDTokenJWTEncoder
 	accessTokenEncoder  oidcencoding.AccessTokenEncoder
 	refreshTokenEncoder oidcencoding.RefreshTokenEncoder
@@ -35,8 +35,8 @@ type TokenHandler struct {
 }
 
 func NewTokenHandler(
-	clientRepository client.ClientRepository,
-	userRepository user.UserRepository,
+	clientsRepository clients.ClientsRepository,
+	usersRepository users.UsersRepository,
 	codeRepository CodeRepository,
 	httpSession session.HTTPSession,
 	accessTokenEncoder oidcencoding.AccessTokenEncoder,
@@ -44,9 +44,9 @@ func NewTokenHandler(
 	idTokenJWTEncoder oidcencoding.IDTokenJWTEncoder,
 ) TokenHandler {
 	return TokenHandler{
-		clientRepository:    clientRepository,
+		clientRepository:    clientsRepository,
 		codeRepository:      codeRepository,
-		userRepository:      userRepository,
+		userRepository:      usersRepository,
 		idTokenJWTEncoder:   idTokenJWTEncoder,
 		httpSession:         httpSession,
 		accessTokenEncoder:  accessTokenEncoder,

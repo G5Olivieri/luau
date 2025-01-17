@@ -2,26 +2,31 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"text/template"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/client"
+	"github.com/G5Olivieri/luau/internal/clients"
+	"github.com/G5Olivieri/luau/internal/config"
 	"github.com/G5Olivieri/luau/internal/csrf"
 	"github.com/G5Olivieri/luau/internal/kms"
 	"github.com/G5Olivieri/luau/internal/oidc"
 	oidcencoding "github.com/G5Olivieri/luau/internal/oidc/encoding"
 	"github.com/G5Olivieri/luau/internal/session"
-	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/G5Olivieri/luau/internal/users"
 	"github.com/G5Olivieri/luau/jose/jwk"
 	"github.com/julienschmidt/httprouter"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
+// TODO: CORS Config
 func CORSHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	origin := r.Header.Get("origin")
 	if origin != "" {
@@ -55,59 +60,57 @@ func CSPHandler(h httprouter.Handle) httprouter.Handle {
 	}
 }
 
+func newGrpcConn(addr, serverName string, configValue config.Config) (*grpc.ClientConn, error) {
+	cert, err := tls.LoadX509KeyPair(configValue.ClientCertPath, configValue.ClientCertPrivateKeyPath)
+	if err != nil {
+		log.Fatalf("failed to load key pair: %s", err)
+	}
+
+	ca := x509.NewCertPool()
+	caBytes, err := os.ReadFile(configValue.CaPath)
+	if err != nil {
+		log.Fatalf("failed to read ca cert %q: %v", configValue.CaPath, err)
+	}
+	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+		log.Fatalf("failed to parse %q", configValue.CaPath)
+	}
+
+	tlsConfig := &tls.Config{
+		ServerName:   serverName,
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      ca,
+	}
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	if err != nil {
+		fmt.Print(err)
+		return nil, err
+	}
+	return conn, nil
+}
+
 func main() {
-	tmpl := template.Must(template.ParseFiles("templates/authorize.html"))
-
-	codeSecretKey := make([]byte, 32)
-	_, err := rand.Read(codeSecretKey)
+	configValue, err := config.GetConfig()
 	if err != nil {
-		log.Println("Error generate codeSecretKey")
-		log.Fatalln(err.Error())
-		return
+		log.Fatal(err.Error())
 	}
 
-	csrfSecret := make([]byte, 32)
-	_, err = rand.Read(csrfSecret)
-	if err != nil {
-		log.Println("Error generate csrfSecret")
-		log.Fatalln(err.Error())
-		return
-	}
-
-	jwtSecretKey := make([]byte, 32)
-	_, err = rand.Read(jwtSecretKey)
-	if err != nil {
-		log.Println("Error generate csrfSecret")
-		log.Fatalln(err.Error())
-		return
-	}
-
-	// https://en.wikipedia.org/wiki/Argon2
-	salt := make([]byte, 16)
-	_, err = rand.Read(salt)
-	if err != nil {
-		log.Println("generate password salt error")
-		log.Fatalln(err.Error())
-		return
-	}
-
-	// TODO: env vars
-	addr := "clients:50051"
-	clientConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	addr := fmt.Sprintf("%s:%d", configValue.Clients.GRPCHost, configValue.Clients.GRPCPort)
+	clientConn, err := newGrpcConn(addr, configValue.Clients.ServerName, configValue)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer clientConn.Close()
 
-	clientRepository := client.NewGRPCClientRepository(clientConn)
+	clientRepository := clients.NewGRPCClientsRepository(clientConn)
 
-	addr = "users:50053"
-	userConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	addr = fmt.Sprintf("%s:%d", configValue.Users.GRPCHost, configValue.Users.GRPCPort)
+	userConn, err := newGrpcConn(addr, configValue.Users.ServerName, configValue)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer clientConn.Close()
-	userRepository := user.NewGRPCUserRepository(userConn)
+	defer userConn.Close()
+	userRepository := users.NewGRPCUsersRepository(userConn)
 
 	sessionStore := session.NewInMemorySessionStore(make(map[string]*session.Session))
 	httpSession := session.NewHttpSession(sessionStore, "session", 14*time.Hour)
@@ -157,11 +160,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	issuer := "https://luau.org"
-	idTokenJWTEncoder := oidcencoding.NewIDTokenJWTEncoder(kmsvalue, issuer, 2*60*60, idTokenKey.GetID())                // 2 hours
-	accessTokenEncoder := oidcencoding.NewAccessTokenJWTEncoder(kmsvalue, issuer, 50*60, accessTokenKey.GetID())         // 50 minutes
-	refreshTokenEncoder := oidcencoding.NewRefreshTokenJWTEncoder(kmsvalue, issuer, 2*24*60*50, refreshTokenKey.GetID()) // 2 days
+	// TODO: get timeout from client and request
+	idTokenJWTEncoder := oidcencoding.NewIDTokenJWTEncoder(kmsvalue, configValue.Issuer, 2*60*60, idTokenKey.GetID())                // 2 hours
+	accessTokenEncoder := oidcencoding.NewAccessTokenJWTEncoder(kmsvalue, configValue.Issuer, 50*60, accessTokenKey.GetID())         // 50 minutes
+	refreshTokenEncoder := oidcencoding.NewRefreshTokenJWTEncoder(kmsvalue, configValue.Issuer, 2*24*60*50, refreshTokenKey.GetID()) // 2 days
 
+	tmpl := template.Must(template.ParseFiles(fmt.Sprintf("%s/authorize.html", configValue.TemplatesDir)))
 	authHandler := oidc.NewAuthHandler(clientRepository, httpSession, userRepository, csrfSync, codeRepository, *tmpl)
 	loginHandler := oidc.NewLoginHandler(clientRepository, userRepository, csrfSync, httpSession, codeRepository)
 	tokenHandler := oidc.NewTokenHandler(
@@ -175,6 +179,7 @@ func main() {
 	)
 
 	r := httprouter.New()
+	// TODO: CORS
 	// Authentication Request MUST support the use of the HTTP GET and POST
 	r.GET("/oidc/auth", CSPHandler(authHandler.Handle))
 	r.POST("/oidc/auth", CSPHandler(authHandler.Handle))
@@ -195,6 +200,7 @@ func main() {
 		json.NewEncoder(w).Encode(jwksResponse)
 	})
 
-	log.Println("Listening :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	addr = fmt.Sprintf("%s:%d", configValue.HTTPHost, configValue.HTTPPort)
+	log.Printf("Listening %s\n", addr)
+	log.Fatal(http.ListenAndServe(addr, r))
 }

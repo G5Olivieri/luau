@@ -1,4 +1,4 @@
-package user
+package users
 
 import (
 	"context"
@@ -10,18 +10,18 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-type GRPCUserRepository struct {
+type GRPCUsersRepository struct {
 	grpcUser pb.UserServiceClient
 }
 
-func NewGRPCUserRepository(conn *grpc.ClientConn) *GRPCUserRepository {
+func NewGRPCUsersRepository(conn *grpc.ClientConn) *GRPCUsersRepository {
 	userServiceUser := pb.NewUserServiceClient(conn)
-	return &GRPCUserRepository{
+	return &GRPCUsersRepository{
 		grpcUser: userServiceUser,
 	}
 }
 
-func (r *GRPCUserRepository) GetByID(ctx context.Context, id string) (*User, error) {
+func (r *GRPCUsersRepository) GetByID(ctx context.Context, id string) (*User, error) {
 	user, err := r.grpcUser.GetByID(ctx, &wrapperspb.StringValue{Value: id})
 
 	if err != nil {
@@ -39,7 +39,7 @@ func (r *GRPCUserRepository) GetByID(ctx context.Context, id string) (*User, err
 	}, nil
 }
 
-func (r *GRPCUserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
+func (r *GRPCUsersRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	user, err := r.grpcUser.GetByUsername(ctx, &wrapperspb.StringValue{Value: username})
 
 	if err != nil {
@@ -57,7 +57,7 @@ func (r *GRPCUserRepository) GetByUsername(ctx context.Context, username string)
 	}, nil
 }
 
-func (r *GRPCUserRepository) GetByUsernamePassword(ctx context.Context, username, password string) (*User, error) {
+func (r *GRPCUsersRepository) GetByUsernamePassword(ctx context.Context, username, password string) (*User, error) {
 	user, err := r.grpcUser.GetByUsernamePassword(ctx, &pb.UsernamePassword{Username: username, Password: password})
 
 	if err != nil {
@@ -75,7 +75,7 @@ func (r *GRPCUserRepository) GetByUsernamePassword(ctx context.Context, username
 	}, nil
 }
 
-func (r *GRPCUserRepository) Update(ctx context.Context, user *User) (*User, error) {
+func (r *GRPCUsersRepository) Update(ctx context.Context, user *User) (*User, error) {
 	res, err := r.grpcUser.Update(ctx, &pb.User{
 		ID:        user.ID,
 		Username:  user.Username,

@@ -36,7 +36,8 @@ func fromClient(client *internal.Client) *restClient {
 }
 
 type restAdapter struct {
-	impl internal.ClientsService
+	impl     internal.ClientsService
+	authHost string
 }
 
 type limitOffset struct {
@@ -244,7 +245,7 @@ func (a restAdapter) updateClient(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, fromClient(clientUpdate))
 }
 
-func authMiddleware(ctx *gin.Context) {
+func (r restAdapter) authMiddleware(ctx *gin.Context) {
 	authorization := ctx.GetHeader("authorization")
 	if authorization == "" {
 		log.Println("authorization is empty")
@@ -275,7 +276,7 @@ func authMiddleware(ctx *gin.Context) {
 	}
 
 	// TODO: get from env
-	verifier, err := NewJWKSVerifierFromUri(ctx, "http://luau:8080/oidc/.well-known/jwks.json")
+	verifier, err := NewJWKSVerifierFromUri(ctx, fmt.Sprintf("%s/.well-known/jwks.json", r.authHost))
 	if err != nil {
 		log.Println(err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -299,16 +300,17 @@ func authMiddleware(ctx *gin.Context) {
 // @authorizationUrl http://localhost:8080/oidc/auth
 // @tokenUrl http://localhost:8080/oidc/token
 // @scope.openid "OpenID Connect scope"
-func NewRestHTTPHandler(impl internal.ClientsService) http.Handler {
+func NewRestHTTPHandler(impl internal.ClientsService, authHost string) http.Handler {
 	router := gin.Default()
 
 	adapter := restAdapter{
-		impl: impl,
+		impl:     impl,
+		authHost: authHost,
 	}
 
 	router.Use()
 
-	apiRouter := router.Group("/api", authMiddleware)
+	apiRouter := router.Group("/api", adapter.authMiddleware)
 
 	apiRouter.POST("/", adapter.createClient)
 	apiRouter.GET("/", adapter.listClients)

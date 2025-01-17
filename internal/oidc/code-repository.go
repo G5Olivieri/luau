@@ -5,15 +5,15 @@ import (
 	"errors"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/client"
-	"github.com/G5Olivieri/luau/internal/user"
+	"github.com/G5Olivieri/luau/internal/clients"
+	"github.com/G5Olivieri/luau/internal/users"
 	"github.com/google/uuid"
 )
 
 type CodeToCreate struct {
-	User                  *user.User
+	User                  *users.User
 	RedirectURI           string
-	Client                *client.Client
+	Client                *clients.Client
 	Nonce                 *string
 	CodeChallenge         *string
 	CodeChallengeMethod   *string
@@ -22,8 +22,8 @@ type CodeToCreate struct {
 
 type Code struct {
 	ID                    string
-	User                  *user.User
-	Client                *client.Client
+	User                  *users.User
+	Client                *clients.Client
 	RedirectURI           string
 	Nonce                 *string
 	CodeChallenge         *string

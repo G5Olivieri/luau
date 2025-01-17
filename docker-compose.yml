@@ -1,23 +1,31 @@
+# TODO: healthcheck
 services:
   luau:
     image: golang:alpine
     working_dir: /app
     depends_on:
       - clients
+      - users
     command: go run cmd/luau/main.go
-    ports:
-      - 8080:8080
+    environment:
+      - ISSUER=luau.org
+      - TEMPLATES_DIR=templates
+      - HTTP_HOST=0.0.0.0
+      - HTTP_PORT=${AUTH_HTTP_PORT}
+    env_file:
+      - .env
     volumes:
       - "gohome:/go"
       - "gocache:/root/.cache/go-build"
       - .:/app
+      - ./keys:/opt/luau/certs
 
   demo:
     image: golang:alpine
     working_dir: /app
     command: go run demo.go
-    ports:
-      - 3000:3000
+    env_file:
+      - .env
     volumes:
       - "gohome:/go"
       - "gocache:/root/.cache/go-build"
@@ -26,34 +34,26 @@ services:
   clients:
     image: golang:alpine
     working_dir: /app/clients
-    command: go run cmd/server/main.go
-    ports:
-      - 50051:50051
-      - 50052:50052
+    command: go run cmd/server/main.go -http_host 0.0.0.0 -http_port ${CLIENTS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${CLIENTS_GRPC_PORT} -ca ${CA_CERT} -cert ${SERVER_CERT} -pkey ${SERVER_PRIVATE_KEY} -auth_host "http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT}"
+    env_file:
+      - .env
     volumes:
       - "gohome:/go"
       - "gocache:/root/.cache/go-build"
       - .:/app
+      - ./keys:/opt/luau/certs
 
   users:
     image: golang:alpine
     working_dir: /app/users
-    command: go run cmd/server/main.go
-    ports:
-      - 50053:50053
-      - 50054:50054
+    command: go run cmd/server/main.go -http_host 0.0.0.0 -http_port ${USERS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${USERS_GRPC_PORT} -ca ${CA_CERT} -cert ${SERVER_CERT} -pkey ${SERVER_PRIVATE_KEY} -auth_host "http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT}"
+    env_file:
+      - .env
     volumes:
       - "gohome:/go"
       - "gocache:/root/.cache/go-build"
       - .:/app
-
-
-    healthcheck:
-      test: ["CMD", "sh", "-c", "netstat -ltn | grep -c 50051"]
-      interval: 5s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
+      - ./keys:/opt/luau/certs
 
   # locust:
   #   build: ./load-testing
@@ -72,12 +72,29 @@ services:
   #   volumes:
   #     - ./clients/clients:/ghz/protos
   #     - ./load-testing/new.json:/opt/ghz/new.json
+  # grpcox:
+  #  image: gusaul/grpcox
+  #  ports:
+  #  - 6969:6969
 
-  grpcox:
-   image: gusaul/grpcox
-   ports:
-   - 6969:6969
+  caddy:
+    image: caddy:2.9
+    env_file:
+      - .env
+    ports:
+    - "80:80"
+    - "443:443"
+    - "443:443/udp"
+    - "50051:50051"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./keys:/opt/luau/certs
+      - caddy_data:/data
+      - caddy_config:/config
+
 
 volumes:
   gohome:
   gocache:
+  caddy_data:
+  caddy_config:
