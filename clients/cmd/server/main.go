@@ -90,8 +90,12 @@ func startHTTP(impl internal.ClientsService, host string, port int) error {
 
 func main() {
 	flag.Parse()
-	if *caFile == "" || *privateKeyFile == "" || *certFile == "" || *authHost == "" {
-		log.Fatal("CA, private key and cert, auth host are required")
+	if *authHost == "" {
+		log.Fatal("auth_host is required")
+	}
+
+	if !*insecure && (*caFile == "" || *privateKeyFile == "" || *certFile == "") {
+		log.Fatal("CA, private key and cert are required")
 	}
 	internalImpl := internal.NewInMemoryClientsService()
 	g.Go(func() error { return startGRPC(internalImpl, *hostGRPC, *portGRPC) })

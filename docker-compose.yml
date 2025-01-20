@@ -1,4 +1,3 @@
-# TODO: healthcheck
 services:
   luau:
     image: golang:alpine
@@ -12,6 +11,9 @@ services:
       - TEMPLATES_DIR=templates
       - HTTP_HOST=0.0.0.0
       - HTTP_PORT=${AUTH_HTTP_PORT}
+    ports:
+      - ${AUTH_HTTP_PORT}:${AUTH_HTTP_PORT}
+
     env_file:
       - .env
     volumes:
@@ -24,6 +26,8 @@ services:
     image: golang:alpine
     working_dir: /app
     command: go run demo.go
+    ports:
+      - "3000:3000"
     env_file:
       - .env
     volumes:
@@ -34,7 +38,10 @@ services:
   clients:
     image: golang:alpine
     working_dir: /app/clients
-    command: go run cmd/server/main.go -http_host 0.0.0.0 -http_port ${CLIENTS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${CLIENTS_GRPC_PORT} -ca ${CA_CERT} -cert ${SERVER_CERT} -pkey ${SERVER_PRIVATE_KEY} -auth_host "http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT}"
+    command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${CLIENTS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${CLIENTS_GRPC_PORT} -insecure
+    ports:
+      - "${CLIENTS_HTTP_PORT}:${CLIENTS_HTTP_PORT}"
+      - "${CLIENTS_GRPC_PORT}:${CLIENTS_GRPC_PORT}"
     env_file:
       - .env
     volumes:
@@ -46,7 +53,10 @@ services:
   users:
     image: golang:alpine
     working_dir: /app/users
-    command: go run cmd/server/main.go -http_host 0.0.0.0 -http_port ${USERS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${USERS_GRPC_PORT} -ca ${CA_CERT} -cert ${SERVER_CERT} -pkey ${SERVER_PRIVATE_KEY} -auth_host "http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT}"
+    command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${USERS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${USERS_GRPC_PORT} -insecure
+    ports:
+      - "${USERS_HTTP_PORT}:${USERS_HTTP_PORT}"
+      - "${USERS_GRPC_PORT}:${USERS_GRPC_PORT}"
     env_file:
       - .env
     volumes:
@@ -55,46 +65,6 @@ services:
       - .:/app
       - ./keys:/opt/luau/certs
 
-  # locust:
-  #   build: ./load-testing
-  #   command: locust
-  #   working_dir: /app
-  #   volumes:
-  #     - ./load-testing:/app
-  #   ports:
-  #   - 8089:8089
-
-  # ghz:
-  #   image: obvionaoe/ghz
-  #   depends_on:
-  #     - clients
-  #   command: --insecure --proto=/ghz/protos/services.proto --call=clients.ClientService.Create --data-file='/opt/ghz/new.json' clients:50051
-  #   volumes:
-  #     - ./clients/clients:/ghz/protos
-  #     - ./load-testing/new.json:/opt/ghz/new.json
-  # grpcox:
-  #  image: gusaul/grpcox
-  #  ports:
-  #  - 6969:6969
-
-  caddy:
-    image: caddy:2.9
-    env_file:
-      - .env
-    ports:
-    - "80:80"
-    - "443:443"
-    - "443:443/udp"
-    - "50051:50051"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./keys:/opt/luau/certs
-      - caddy_data:/data
-      - caddy_config:/config
-
-
 volumes:
   gohome:
   gocache:
-  caddy_data:
-  caddy_config:

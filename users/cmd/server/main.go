@@ -29,6 +29,7 @@ var (
 	certFile       = flag.String("cert", "", "Certificate file (PEM)")
 	privateKeyFile = flag.String("pkey", "", "Privatey key file (PEM)")
 	authHost       = flag.String("auth_host", "", "Auth host")
+	insecure       = flag.Bool("insecure", false, "gRPC insecure transport")
 	g              errgroup.Group
 )
 
@@ -38,26 +39,31 @@ func startGRPC(impl internal.UsersService, host string, port int) error {
 		log.Fatalf("failed to listen %v\n", err)
 	}
 
-	cert, err := tls.LoadX509KeyPair(*certFile, *privateKeyFile)
-	if err != nil {
-		log.Fatalf("failed to load key pair: %s", err)
-	}
+	var s *grpc.Server
+	if *insecure {
+		s = grpc.NewServer()
+	} else {
+		cert, err := tls.LoadX509KeyPair(*certFile, *privateKeyFile)
+		if err != nil {
+			log.Fatalf("failed to load key pair: %s", err)
+		}
 
-	ca := x509.NewCertPool()
-	caBytes, err := os.ReadFile(*caFile)
-	if err != nil {
-		log.Fatalf("failed to read ca cert %q: %v", *caFile, err)
-	}
-	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
-		log.Fatalf("failed to parse %q", *caFile)
-	}
+		ca := x509.NewCertPool()
+		caBytes, err := os.ReadFile(*caFile)
+		if err != nil {
+			log.Fatalf("failed to read ca cert %q: %v", *caFile, err)
+		}
+		if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+			log.Fatalf("failed to parse %q", *caFile)
+		}
 
-	tlsConfig := &tls.Config{
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{cert},
-		ClientCAs:    ca,
+		tlsConfig := &tls.Config{
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			Certificates: []tls.Certificate{cert},
+			ClientCAs:    ca,
+		}
+		s = grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
-	s := grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
 
 	server := adapters.NewGRPCServer(impl)
 
@@ -84,7 +90,11 @@ func startHTTP(impl internal.UsersService, host string, port int) error {
 
 func main() {
 	flag.Parse()
-	if *caFile == "" || *privateKeyFile == "" || *certFile == "" || *authHost == "" {
+	if *authHost == "" {
+		log.Fatal("auth_host is required")
+	}
+
+	if !*insecure && (*caFile == "" || *privateKeyFile == "" || *certFile == "") {
 		log.Fatal("CA, private key and cert are required")
 	}
 	// https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html

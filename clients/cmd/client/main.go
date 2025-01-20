@@ -14,6 +14,7 @@ import (
 	pb "github.com/G5Olivieri/luau/clients/clients"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type createClient struct {
@@ -33,7 +34,7 @@ var (
 	caFile         = flag.String("ca", "", "CA file (PEM)")
 	certFile       = flag.String("cert", "", "Certificate file (PEM)")
 	privateKeyFile = flag.String("pkey", "", "Privatey key file (PEM)")
-	insecure       = flag.Bool("insecure", false, "Insecure gRPC connection")
+	insecureFlag   = flag.Bool("insecure", false, "Insecure gRPC connection")
 )
 
 func toClient(c *pb.Client) client {
@@ -45,7 +46,7 @@ func toClient(c *pb.Client) client {
 }
 
 func newGrpcConn() (conn *grpc.ClientConn, err error) {
-	if *insecure {
+	if *insecureFlag {
 		conn, err = grpc.NewClient(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
 		cert, err := tls.LoadX509KeyPair(*certFile, *privateKeyFile)
@@ -84,9 +85,11 @@ func main() {
 		fmt.Println("missing cmd")
 		os.Exit(1)
 	}
-	if *caFile == "" || *certFile == "" || *privateKeyFile == "" {
-		log.Fatal("missing ca, cert or pkey")
+
+	if !*insecureFlag && (*caFile == "" || *privateKeyFile == "" || *certFile == "") {
+		log.Fatal("CA, private key and cert are required")
 	}
+
 	cmd, args := args[0], args[1:]
 	switch cmd {
 	case "create":
