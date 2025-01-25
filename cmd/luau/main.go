@@ -24,6 +24,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // TODO: CORS Config
@@ -61,32 +62,36 @@ func CSPHandler(h httprouter.Handle) httprouter.Handle {
 }
 
 func newGrpcConn(addr, serverName string, configValue config.Config) (*grpc.ClientConn, error) {
-	cert, err := tls.LoadX509KeyPair(configValue.ClientCertPath, configValue.ClientCertPrivateKeyPath)
-	if err != nil {
-		log.Fatalf("failed to load key pair: %s", err)
-	}
+	if configValue.GrpcInsecure {
+		return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		cert, err := tls.LoadX509KeyPair(configValue.ClientCertPath, configValue.ClientCertPrivateKeyPath)
+		if err != nil {
+			log.Fatalf("failed to load key pair: %s", err)
+		}
 
-	ca := x509.NewCertPool()
-	caBytes, err := os.ReadFile(configValue.CaPath)
-	if err != nil {
-		log.Fatalf("failed to read ca cert %q: %v", configValue.CaPath, err)
-	}
-	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
-		log.Fatalf("failed to parse %q", configValue.CaPath)
-	}
+		ca := x509.NewCertPool()
+		caBytes, err := os.ReadFile(configValue.CaPath)
+		if err != nil {
+			log.Fatalf("failed to read ca cert %q: %v", configValue.CaPath, err)
+		}
+		if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+			log.Fatalf("failed to parse %q", configValue.CaPath)
+		}
 
-	tlsConfig := &tls.Config{
-		ServerName:   serverName,
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      ca,
-	}
+		tlsConfig := &tls.Config{
+			ServerName:   serverName,
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      ca,
+		}
 
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
-	if err != nil {
-		fmt.Print(err)
-		return nil, err
+		conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+		if err != nil {
+			fmt.Print(err)
+			return nil, err
+		}
+		return conn, nil
 	}
-	return conn, nil
 }
 
 func main() {

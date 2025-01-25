@@ -11,7 +11,16 @@ require (
 	google.golang.org/protobuf v1.36.2
 )
 
-require golang.org/x/sync v0.10.0 // indirect
+require (
+	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
+	github.com/go-playground/form v3.1.4+incompatible // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/go-playground/validator/v10 v10.24.0 // indirect
+	github.com/leodido/go-urn v1.4.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+)
 
 require (
 	github.com/G5Olivieri/luau/users v0.0.0-00010101000000-000000000000

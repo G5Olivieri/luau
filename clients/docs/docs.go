@@ -271,6 +271,10 @@ const docTemplate = `{
                     "example": [
                         "https://client-app.com/oauth/callback"
                     ]
+                },
+                "secret": {
+                    "type": "string",
+                    "format": "base64"
                 }
             }
         },

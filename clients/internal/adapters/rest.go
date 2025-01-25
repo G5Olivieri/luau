@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -20,11 +21,12 @@ type restClient struct {
 	ID           uuid.UUID         `json:"id" format:"uuid"`
 	Name         map[string]string `json:"name" example:"default:client,pt_BR:cliente"`
 	RedirectURIs []string          `json:"redirect_uris" swaggertype:"array,string" format:"uri" example:"https://client-app.com/oauth/callback"`
+	Secret       string            `json:"secret" format:"base64"`
 }
 
 type restCreateOrUpdateClientRequest struct {
-	Name         map[string]string `json:"name" example:"default:client,pt_BR:cliente"`
-	RedirectURIs []string          `json:"redirect_uris" swaggertype:"array,string" format:"uri" example:"https://client-app.com/oauth/callback"`
+	Name         map[string]string `json:"name" example:"default:client,pt_BR:cliente" binding:"required"`
+	RedirectURIs []string          `json:"redirect_uris" swaggertype:"array,string" format:"uri" example:"https://client-app.com/oauth/callback" binding:"required,dive,required"`
 }
 
 func fromClient(client *internal.Client) *restClient {
@@ -32,6 +34,7 @@ func fromClient(client *internal.Client) *restClient {
 		ID:           client.ID,
 		Name:         client.Name,
 		RedirectURIs: urisURLToStrings(client.RedirectURIs),
+		Secret:       base64.StdEncoding.EncodeToString(client.Secret),
 	}
 }
 
@@ -82,6 +85,7 @@ func (a restAdapter) listClients(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+
 	response := make([]*restClient, 0, len(clients))
 	for _, v := range clients {
 		response = append(response, fromClient(v))
@@ -276,7 +280,7 @@ func (r restAdapter) authMiddleware(ctx *gin.Context) {
 	}
 
 	// TODO: get from env
-	verifier, err := NewJWKSVerifierFromUri(ctx, fmt.Sprintf("%s/.well-known/jwks.json", r.authHost))
+	verifier, err := NewJWKSVerifierFromUri(ctx, fmt.Sprintf("%s/oidc/.well-known/jwks.json", r.authHost))
 	if err != nil {
 		log.Println(err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -308,12 +312,10 @@ func NewRestHTTPHandler(impl internal.ClientsService, authHost string) http.Hand
 		authHost: authHost,
 	}
 
-	router.Use()
-
 	apiRouter := router.Group("/api", adapter.authMiddleware)
 
-	apiRouter.POST("/", adapter.createClient)
-	apiRouter.GET("/", adapter.listClients)
+	apiRouter.POST("", adapter.createClient)
+	apiRouter.GET("", adapter.listClients)
 	apiRouter.GET("/:id", adapter.getClientByID)
 	apiRouter.DELETE("/:id", adapter.deleteClientByID)
 	apiRouter.PUT("/:id", adapter.updateClient)

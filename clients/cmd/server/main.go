@@ -21,16 +21,17 @@ import (
 )
 
 var (
-	hostGRPC       = flag.String("grpc_host", "", "The gRPC server host")
-	portGRPC       = flag.Int("grpc_port", 50053, "The gRPC server port")
-	hostHTTP       = flag.String("http_host", "", "The HTTP server host")
-	portHTTP       = flag.Int("http_port", 50054, "The HTTP server port")
-	caFile         = flag.String("ca", "", "CA file (PEM)")
-	certFile       = flag.String("cert", "", "Certificate file (PEM)")
-	privateKeyFile = flag.String("pkey", "", "Privatey key file (PEM)")
-	authHost       = flag.String("auth_host", "", "Auth host")
-	insecure       = flag.Bool("insecure", false, "Insecure GRPC transport")
-	g              errgroup.Group
+	hostGRPC          = flag.String("grpc_host", "", "The gRPC server host")
+	portGRPC          = flag.Int("grpc_port", 50053, "The gRPC server port")
+	hostHTTP          = flag.String("http_host", "", "The HTTP server host")
+	portHTTP          = flag.Int("http_port", 50054, "The HTTP server port")
+	caFile            = flag.String("ca", "", "CA file (PEM)")
+	certFile          = flag.String("cert", "", "Certificate file (PEM)")
+	privateKeyFile    = flag.String("pkey", "", "Privatey key file (PEM)")
+	authHost          = flag.String("auth_host", "", "Auth host")
+	insecure          = flag.Bool("insecure", false, "Insecure GRPC transport")
+	initialClientPath = flag.String("initial_client", "", "The path to initial client (JSON)")
+	g                 errgroup.Group
 )
 
 func startGRPC(impl internal.ClientsService, host string, port int) error {
@@ -97,7 +98,15 @@ func main() {
 	if !*insecure && (*caFile == "" || *privateKeyFile == "" || *certFile == "") {
 		log.Fatal("CA, private key and cert are required")
 	}
+
 	internalImpl := internal.NewInMemoryClientsService()
+	if *initialClientPath != "" {
+		created, err := adapters.CreateFromJson(internalImpl, *initialClientPath)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		log.Println(created)
+	}
 	g.Go(func() error { return startGRPC(internalImpl, *hostGRPC, *portGRPC) })
 	g.Go(func() error { return startHTTP(internalImpl, *hostHTTP, *portHTTP) })
 	if err := g.Wait(); err != nil {

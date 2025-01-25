@@ -4,7 +4,7 @@ package clients;
 
 import "jose/jwk.proto";
 
-option go_package = "github.com/G5Olivieri/luau/clients";
+option go_package = "github.com/G5Olivieri/luau/clients/clients";
 
 enum GrantType {
   GRANT_TYPE_UNSPECIFIED = 0;
@@ -79,34 +79,35 @@ message CreateClientRequest {
 
 message Client {
   string ID = 1;
-  map<string, string> name = 2;
-  repeated string redirect_uris = 3;
-	repeated ResponseType response_types = 4;
-	repeated GrantType grant_types = 5;
-  int32 default_max_age = 6;
-  repeated string contacts = 7;
-  TokenEndpointAuthMethod token_endpoint_auth_method = 8;
-  ApplicationType application_type = 9;
-  map<string, string> logo_uri = 10;
-  map<string, string> client_uri = 11;
-  map<string, string> policy_uri = 12;
-  map<string, string> tos_uri = 13;
-  string jwks_uri = 14;
-  repeated jose.JWK jwks = 15;
-  string sector_identifier_uri = 16;
-  SubjectType subject_type = 17;
-  string id_token_signed_response_alg = 18;
-  string id_token_encrypted_response_alg = 19;
-  string id_token_encrypted_response_enc = 20;
-  string userinfo_signed_response_alg = 21;
-  string userinfo_encrypted_response_alg = 22;
-  string userinfo_encrypted_response_enc = 23;
-  string request_object_signing_alg = 24;
-  string request_object_encryption_alg = 25;
-  string request_object_encryption_enc = 26;
-  string token_endpoint_auth_signing_alg = 27;
-  bool require_auth_time = 28;
-  repeated string default_acr_values = 29;
-  string initiate_login_uri = 30;
-  repeated string request_uris = 31;
+  bytes secret = 2;
+  map<string, string> name = 3;
+  repeated string redirect_uris = 4;
+	repeated ResponseType response_types = 5;
+	repeated GrantType grant_types = 6;
+  int32 default_max_age = 7;
+  repeated string contacts = 8;
+  TokenEndpointAuthMethod token_endpoint_auth_method = 9;
+  ApplicationType application_type = 10;
+  map<string, string> logo_uri = 11;
+  map<string, string> client_uri = 12;
+  map<string, string> policy_uri = 13;
+  map<string, string> tos_uri = 14;
+  string jwks_uri = 15;
+  repeated jose.JWK jwks = 16;
+  string sector_identifier_uri = 17;
+  SubjectType subject_type = 18;
+  string id_token_signed_response_alg = 19;
+  string id_token_encrypted_response_alg = 20;
+  string id_token_encrypted_response_enc = 21;
+  string userinfo_signed_response_alg = 22;
+  string userinfo_encrypted_response_alg = 23;
+  string userinfo_encrypted_response_enc = 24;
+  string request_object_signing_alg = 25;
+  string request_object_encryption_alg = 26;
+  string request_object_encryption_enc = 27;
+  string token_endpoint_auth_signing_alg = 28;
+  bool require_auth_time = 29;
+  repeated string default_acr_values = 30;
+  string initiate_login_uri = 31;
+  repeated string request_uris = 32;
 }

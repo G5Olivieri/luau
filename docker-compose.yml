@@ -38,7 +38,7 @@ services:
   clients:
     image: golang:alpine
     working_dir: /app/clients
-    command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${CLIENTS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${CLIENTS_GRPC_PORT} -insecure
+    command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${CLIENTS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${CLIENTS_GRPC_PORT} -insecure -initial_client cmd/client/create-client.json
     ports:
       - "${CLIENTS_HTTP_PORT}:${CLIENTS_HTTP_PORT}"
       - "${CLIENTS_GRPC_PORT}:${CLIENTS_GRPC_PORT}"

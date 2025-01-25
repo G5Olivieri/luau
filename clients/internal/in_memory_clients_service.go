@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"sync"
 
@@ -26,10 +27,16 @@ func NewInMemoryClientsService() *InMemoryClientsService {
 
 func (s *InMemoryClientsService) Create(_ context.Context, request *CreateClientRequest) (*Client, error) {
 	id := uuid.New()
+	secret := make([]byte, 32)
+	_, err := rand.Read(secret)
+	if err != nil {
+		return nil, err
+	}
 	client := &Client{
 		ID:           id,
 		Name:         request.Name,
 		RedirectURIs: request.RedirectURIs,
+		Secret:       secret,
 	}
 	s.mutex.Lock()
 	s.clients[id] = client

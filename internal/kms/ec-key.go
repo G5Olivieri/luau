@@ -142,6 +142,5 @@ func (key *ECKey) JWK() jwk.JWK {
 		Use:    &keySpec.Use,
 		Alg:    &keySpec.Alg,
 		KeyOps: keySpec.KeyOps,
-		// TODO: x5t, x5c, x5u, x5tS256
 	}
 }

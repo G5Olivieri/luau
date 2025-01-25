@@ -27,6 +27,7 @@ type Config struct {
 	CaPath                   string
 	ClientCertPath           string
 	ClientCertPrivateKeyPath string
+	GrpcInsecure             bool
 	HTTPHost                 string
 	HTTPPort                 int
 	Clients                  ClientsConfig
@@ -143,6 +144,8 @@ func GetConfig() (Config, error) {
 		return config, fmt.Errorf("environment TEMPLATES_DIR is missing")
 	}
 	config.TemplatesDir = templatesDir
+
+	config.GrpcInsecure = os.Getenv("GRPC_INSECURE") == "true"
 
 	return config, nil
 }

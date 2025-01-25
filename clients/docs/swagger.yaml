@@ -18,6 +18,9 @@ definitions:
           format: uri
           type: string
         type: array
+      secret:
+        format: base64
+        type: string
     type: object
   adapters.restCreateOrUpdateClientRequest:
     properties:

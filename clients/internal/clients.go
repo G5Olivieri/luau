@@ -14,6 +14,7 @@ type Client struct {
 	ID           uuid.UUID
 	Name         map[string]string
 	RedirectURIs []url.URL
+	Secret       []byte
 }
 
 type CreateClientRequest struct {

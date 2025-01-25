@@ -18,8 +18,8 @@ import (
 )
 
 type restUsernamePassword struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 type restUser struct {
@@ -30,8 +30,8 @@ type restUser struct {
 }
 
 type restCreateOrUpdateUserRequest struct {
-	Username  string     `json:"username"`
-	Password  string     `json:"password"`
+	Username  string     `json:"username" binding:"required"`
+	Password  string     `json:"password" binding:"required"`
 	LastLogin *time.Time `json:"last_login,omitempty" format:"date-time"`
 }
 
@@ -373,8 +373,8 @@ func NewRestHTTPHandler(impl internal.UsersService, authHost string) http.Handle
 
 	apiRouter := router.Group("/api", adapter.authMiddleware)
 
-	apiRouter.POST("/", adapter.createUser)
-	apiRouter.GET("/", adapter.listUsers)
+	apiRouter.POST("", adapter.createUser)
+	apiRouter.GET("", adapter.listUsers)
 	apiRouter.GET("/:id", adapter.getUserByID)
 	apiRouter.DELETE("/:id", adapter.deleteUserByID)
 	apiRouter.PUT("/:id", adapter.updateUser)

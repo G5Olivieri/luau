@@ -19,13 +19,13 @@ import (
 
 type createClient struct {
 	Name         map[string]string `json:"name"`
-	RedirectURIs []string          `json:"redirect_uris"`
+	RedirectURIs []string          `json:"redirectUris"`
 }
 
 type client struct {
 	ID           string            `json:"id"`
 	Name         map[string]string `json:"name"`
-	RedirectURIs []string          `json:"redirect_uris"`
+	RedirectURIs []string          `json:"redirectUris"`
 }
 
 var (

@@ -1,6 +1,6 @@
 {
     "name": {
-        "default": "Client #1"
+        "default": "Clients Swagger"
     },
-    "redirect_uris": ["http://localhost:3000/callback.html"]
+    "redirectUris": ["http://localhost:5050/swagger/oauth2-redirect.html"]
 }

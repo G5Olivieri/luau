@@ -38,6 +38,7 @@ func (s *GRPCServer) Create(ctx context.Context, request *pb.CreateClientRequest
 		ID:           clientCreated.ID.String(),
 		Name:         clientCreated.Name,
 		RedirectUris: urisURLToStrings(clientCreated.RedirectURIs),
+		Secret:       clientCreated.Secret,
 	}, nil
 }
 
@@ -70,6 +71,7 @@ func (s *GRPCServer) Update(ctx context.Context, request *pb.Client) (*pb.Client
 		ID:           clientUpdated.ID.String(),
 		Name:         clientUpdated.Name,
 		RedirectUris: urisURLToStrings(clientUpdated.RedirectURIs),
+		Secret:       clientUpdated.Secret,
 	}, nil
 }
 
@@ -109,6 +111,7 @@ func (s *GRPCServer) GetByID(ctx context.Context, providedID *wrapperspb.StringV
 		ID:           client.ID.String(),
 		Name:         client.Name,
 		RedirectUris: urisURLToStrings(client.RedirectURIs),
+		Secret:       client.Secret,
 	}, nil
 }
 
@@ -125,6 +128,7 @@ func (s *GRPCServer) List(ctx context.Context, request *pb.LimitOffset) (*pb.Cli
 			ID:           client.ID.String(),
 			Name:         client.Name,
 			RedirectUris: urisURLToStrings(client.RedirectURIs),
+			Secret:       client.Secret,
 		})
 	}
 

@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"encoding/base64"
 
 	pb "github.com/G5Olivieri/luau/clients/clients"
 	"google.golang.org/grpc"
@@ -32,7 +33,9 @@ func (r *GRPCClientsRepository) GetByID(ctx context.Context, id string) (*Client
 	}
 
 	return &Client{
-		ID:             client.ID,
-		RawRedirectURI: client.RedirectUris[0],
+		ID: client.GetID(),
+		// TODO: use []string
+		RawRedirectURI: client.GetRedirectUris()[0],
+		Secret:         base64.StdEncoding.EncodeToString(client.GetSecret()),
 	}, nil
 }
