@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/kms"
+	internalkms "github.com/G5Olivieri/luau/internal/kms"
 	luaujwt "github.com/G5Olivieri/luau/jose/jwt"
+	"github.com/G5Olivieri/luau/kms"
 )
 
 type AccessTokenRequest struct {
@@ -53,7 +54,7 @@ func (e AccessTokenJWTEncoder) Encode(ctx context.Context, r AccessTokenRequest)
 		Exp:      now.Add(time.Duration(e.expiresIn) * time.Second).Unix(),
 	}
 
-	signer, err := kms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
+	signer, err := internalkms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
 
 	if err != nil {
 		return "", err
@@ -65,7 +66,7 @@ func (e AccessTokenJWTEncoder) Encode(ctx context.Context, r AccessTokenRequest)
 func (e AccessTokenJWTEncoder) Decode(ctx context.Context, jwtString string) (*AccessTokenPayload, error) {
 	var payload *AccessTokenPayload
 
-	verifier, err := kms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
+	verifier, err := internalkms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
 	if err != nil {
 		return nil, err
 	}

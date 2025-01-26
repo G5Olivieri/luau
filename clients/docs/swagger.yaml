@@ -38,6 +38,9 @@ definitions:
           format: uri
           type: string
         type: array
+    required:
+    - name
+    - redirect_uris
     type: object
 info:
   contact: {}

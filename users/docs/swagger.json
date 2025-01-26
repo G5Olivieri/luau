@@ -322,6 +322,10 @@
     "definitions": {
         "adapters.restCreateOrUpdateUserRequest": {
             "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
             "properties": {
                 "last_login": {
                     "type": "string",
@@ -356,6 +360,10 @@
         },
         "adapters.restUsernamePassword": {
             "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
             "properties": {
                 "password": {
                     "type": "string"

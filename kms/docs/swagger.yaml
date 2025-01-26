@@ -1,0 +1,354 @@
+definitions:
+  adapters.restCreateOrUpdateKeyRequest:
+    properties:
+      alg:
+        enum:
+        - HS256
+        - HS384
+        - HS512
+        - RS256
+        - RS384
+        - RS512
+        - PS256
+        - PS384
+        - PS512
+        - ES256
+        - ES384
+        - ES512
+        type: string
+      key_ops:
+        items:
+          type: string
+        type: array
+      typ:
+        enum:
+        - RSA
+        - EC
+        - OCT
+        type: string
+      use:
+        enum:
+        - sig
+        - enc
+        type: string
+    required:
+    - alg
+    - key_ops
+    - typ
+    - use
+    type: object
+  adapters.restJwk:
+    properties:
+      alg:
+        type: string
+      crv:
+        description: EC Public Key
+        type: string
+      d:
+        description: EC and RSA Private Key
+        type: string
+      dp:
+        description: RSA Private Key
+        type: string
+      dq:
+        type: string
+      e:
+        description: RSA Public Key
+        type: string
+      k:
+        description: oct
+        type: string
+      key_ops:
+        items:
+          type: string
+        type: array
+      kid:
+        type: string
+      kty:
+        type: string
+      "n":
+        type: string
+      qi:
+        type: string
+      use:
+        type: string
+      x:
+        type: string
+      x5c:
+        items:
+          type: string
+        type: array
+      x5t:
+        type: string
+      x5t#S256:
+        type: string
+      x5u:
+        format: uri
+        type: string
+      "y":
+        type: string
+    type: object
+  adapters.restJwks:
+    properties:
+      jwks:
+        items:
+          $ref: '#/definitions/adapters.restJwk'
+        type: array
+    type: object
+  adapters.signRequest:
+    properties:
+      message:
+        format: base64
+        type: string
+    required:
+    - message
+    type: object
+  adapters.signResponse:
+    properties:
+      signature:
+        format: base64
+        type: string
+    required:
+    - signature
+    type: object
+  adapters.verifyRequest:
+    properties:
+      message:
+        format: base64
+        type: string
+      signature:
+        format: base64
+        type: string
+    required:
+    - message
+    - signature
+    type: object
+  adapters.verifyResponse:
+    properties:
+      valid:
+        type: boolean
+    type: object
+info:
+  contact: {}
+paths:
+  /:
+    get:
+      consumes:
+      - application/json
+      description: list keys
+      parameters:
+      - default: 256
+        description: 'limit items (max: 1024)'
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: offset items
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/adapters.restJwks'
+            type: array
+        "400":
+          description: Bad Request
+      security:
+      - OAuth2Application:
+        - openid
+      summary: list keys
+      tags:
+      - keys
+    post:
+      consumes:
+      - application/json
+      description: create a key
+      parameters:
+      - description: create key
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/adapters.restCreateOrUpdateKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/adapters.restJwk'
+        "400":
+          description: Bad Request
+      security:
+      - OAuth2Application:
+        - openid
+      summary: create a key
+      tags:
+      - keys
+  /{id}:
+    get:
+      consumes:
+      - application/json
+      description: get a key by id
+      parameters:
+      - description: key id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/adapters.restJwk'
+        "404":
+          description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
+      summary: get key by id
+      tags:
+      - keys
+  /{id}/public-key:
+    get:
+      consumes:
+      - application/json
+      description: get a public key by id
+      parameters:
+      - description: key id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/adapters.restJwk'
+        "404":
+          description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
+      summary: get public key by id
+      tags:
+      - keys
+  /{id}/sign:
+    post:
+      consumes:
+      - application/json
+      description: sign
+      parameters:
+      - description: sign message
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/adapters.signRequest'
+      - description: key id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/adapters.signResponse'
+        "404":
+          description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
+      summary: sign
+      tags:
+      - keys
+  /{id}/verify:
+    post:
+      consumes:
+      - application/json
+      description: verify
+      parameters:
+      - description: key id
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: verify message
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/adapters.verifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/adapters.verifyResponse'
+        "404":
+          description: Not Found
+      security:
+      - OAuth2Application:
+        - openid
+      summary: verify
+      tags:
+      - keys
+  /public-keys:
+    get:
+      consumes:
+      - application/json
+      description: list public keys
+      parameters:
+      - default: 256
+        description: 'limit items (max: 1024)'
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: offset items
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/adapters.restJwks'
+            type: array
+        "400":
+          description: Bad Request
+      security:
+      - OAuth2Application:
+        - openid
+      summary: list public keys
+      tags:
+      - keys
+securityDefinitions:
+  OAuth2Application:
+    authorizationUrl: http://localhost:8080/oidc/auth
+    flow: accessCode
+    scopes:
+      openid: '"OpenID Connect scope"'
+    tokenUrl: http://localhost:8080/oidc/token
+    type: oauth2
+swagger: "2.0"

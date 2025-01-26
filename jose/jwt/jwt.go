@@ -21,7 +21,7 @@ var (
 
 type Signer interface {
 	Sign(context.Context, []byte) ([]byte, error)
-	GetKeySpec() jwk.JWK
+	GetKeySpec() (*jwk.JWK, error)
 }
 
 type Verifier interface {
@@ -29,8 +29,12 @@ type Verifier interface {
 }
 
 func EncodeCompact(ctx context.Context, signer Signer, claims any) (string, error) {
+	keySpec, err := signer.GetKeySpec()
+	if err != nil {
+		return "", err
+	}
 	// TODO: verify more field in header
-	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", *signer.GetKeySpec().Alg, *signer.GetKeySpec().Kid)
+	header := fmt.Sprintf("{\"alg\":\"%s\",\"typ\":\"JWT\",\"kid\":\"%s\"}", *keySpec.Alg, *keySpec.Kid)
 	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err

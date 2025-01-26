@@ -1,8 +1,10 @@
-package kms
+package internal
 
 import (
 	"crypto"
 	"strings"
+
+	"github.com/G5Olivieri/luau/kms"
 )
 
 func getHasherFromString(alg string) (crypto.Hash, error) {
@@ -15,5 +17,5 @@ func getHasherFromString(alg string) (crypto.Hash, error) {
 	if strings.HasSuffix(alg, "S512") {
 		return crypto.SHA512, nil
 	}
-	return crypto.SHA256, ErrInvalidHasher
+	return crypto.SHA256, kms.ErrInvalidHasher
 }

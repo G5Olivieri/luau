@@ -22,6 +22,14 @@ type UsersConfig struct {
 	HTTPPort   int
 }
 
+type KMSConfig struct {
+	ServerName string
+	GRPCHost   string
+	GRPCPort   int
+	HTTPHost   string
+	HTTPPort   int
+}
+
 type Config struct {
 	Issuer                   string
 	CaPath                   string
@@ -32,6 +40,7 @@ type Config struct {
 	HTTPPort                 int
 	Clients                  ClientsConfig
 	Users                    UsersConfig
+	KMS                      KMSConfig
 	TemplatesDir             string
 }
 
@@ -137,6 +146,39 @@ func GetConfig() (Config, error) {
 		HTTPPort:   usersHttpPort,
 		GRPCHost:   usersGrpcHost,
 		GRPCPort:   usersGrpcPort,
+	}
+
+	kmsHttpHost := os.Getenv("KMS_HTTP_HOST")
+	if kmsHttpHost == "" {
+		return config, fmt.Errorf("environment KMS_HTTP_HOST is missing")
+	}
+
+	kmsHttpPort, err := strconv.Atoi(os.Getenv("KMS_HTTP_PORT"))
+	if err != nil {
+		return config, fmt.Errorf("environment KMS_HTTP_PORT: %v", err)
+	}
+
+	kmsGrpcHost := os.Getenv("KMS_GRPC_HOST")
+	if clientsHttpHost == "" {
+		return config, fmt.Errorf("environment KMS_HTTP_HOST is missing")
+	}
+
+	kmsGrpcPort, err := strconv.Atoi(os.Getenv("KMS_GRPC_PORT"))
+	if err != nil {
+		return config, fmt.Errorf("environment KMS_GRPC_PORT: %v", err)
+	}
+
+	kmsServerName := os.Getenv("KMS_SERVER_NAME")
+	if kmsServerName == "" {
+		return config, fmt.Errorf("environment KMS_SERVER_NAME is missing")
+	}
+
+	config.KMS = KMSConfig{
+		ServerName: kmsServerName,
+		HTTPHost:   kmsHttpHost,
+		HTTPPort:   kmsHttpPort,
+		GRPCHost:   kmsGrpcHost,
+		GRPCPort:   kmsGrpcPort,
 	}
 
 	templatesDir := os.Getenv("TEMPLATES_DIR")

@@ -1,10 +1,14 @@
 services:
   luau:
-    image: golang:alpine
+    build: .
     working_dir: /app
     depends_on:
-      - clients
-      - users
+      clients:
+        condition: service_started
+      users:
+        condition: service_started
+      kms:
+        condition: service_healthy
     command: go run cmd/luau/main.go
     environment:
       - ISSUER=luau.org
@@ -23,7 +27,7 @@ services:
       - ./keys:/opt/luau/certs
 
   demo:
-    image: golang:alpine
+    build: .
     working_dir: /app
     command: go run demo.go
     ports:
@@ -36,7 +40,7 @@ services:
       - ./demo:/app
 
   clients:
-    image: golang:alpine
+    build: .
     working_dir: /app/clients
     command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${CLIENTS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${CLIENTS_GRPC_PORT} -insecure -initial_client cmd/client/create-client.json
     ports:
@@ -51,7 +55,7 @@ services:
       - ./keys:/opt/luau/certs
 
   users:
-    image: golang:alpine
+    build: .
     working_dir: /app/users
     command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${USERS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${USERS_GRPC_PORT} -insecure
     ports:
@@ -64,6 +68,32 @@ services:
       - "gocache:/root/.cache/go-build"
       - .:/app
       - ./keys:/opt/luau/certs
+
+  kms:
+    build: .
+    working_dir: /app/kms
+    command: go run cmd/server/main.go -auth_host http://${AUTH_HTTP_HOST}:${AUTH_HTTP_PORT} -http_host 0.0.0.0 -http_port ${KMS_HTTP_PORT} -grpc_host 0.0.0.0 -grpc_port ${KMS_GRPC_PORT} -insecure
+    ports:
+      - "${KMS_HTTP_PORT}:${KMS_HTTP_PORT}"
+      - "${KMS_GRPC_PORT}:${KMS_GRPC_PORT}"
+    env_file:
+      - .env
+    volumes:
+      - "gohome:/go"
+      - "gocache:/root/.cache/go-build"
+      - .:/app
+      - ./keys:/opt/luau/certs
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "$KMS_GRPC_HOST", "$KMS_GRPC_PORT"]
+      interval: 1s
+      timeout: 10s
+      retries: 10
+      start_period: 1s
+
+  grpcox:
+    image: gusaul/grpcox
+    ports:
+      - "6969:6969"
 
 volumes:
   gohome:

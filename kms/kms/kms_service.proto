@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package kms;
+
+import "google/protobuf/wrappers.proto";
+import "jose/jwk.proto";
+
+option go_package = "github.com/G5Olivieri/luau/kms";
+
+service KMSService {
+	rpc GenerateKey (CreateKeyRequest) returns (jose.JWK) {}
+	rpc GetPublicKey (google.protobuf.StringValue) returns (jose.JWK) {}
+	rpc Get (google.protobuf.StringValue) returns (jose.JWK) {}
+	rpc GetPublicKeys (LimitOffset) returns (jose.JWKS) {}
+	rpc List (LimitOffset) returns (jose.JWKS) {}
+	rpc Sign (SignRequest) returns (google.protobuf.BytesValue) {}
+	rpc Verify (VerifyRequest) returns (google.protobuf.BoolValue) {}
+}
+
+message LimitOffset {
+	int32 limit = 1;
+	int32 offset = 2;
+}
+
+message SignRequest {
+    string id = 1;
+    bytes message = 2;
+}
+
+message VerifyRequest {
+    string id = 1;
+    bytes message = 2;
+    bytes signature = 3;
+}
+
+message CreateKeyRequest {
+	jose.JWKAlg alg = 1;
+	jose.JWKType key_type = 2;
+	repeated jose.JWKKeyOps key_ops = 3;
+	jose.JWKUse use = 4;
+}

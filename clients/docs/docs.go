@@ -280,6 +280,10 @@ const docTemplate = `{
         },
         "adapters.restCreateOrUpdateClientRequest": {
             "type": "object",
+            "required": [
+                "name",
+                "redirect_uris"
+            ],
             "properties": {
                 "name": {
                     "type": "object",

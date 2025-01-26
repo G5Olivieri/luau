@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/G5Olivieri/luau/internal/kms"
+	internalkms "github.com/G5Olivieri/luau/internal/kms"
 	luaujwt "github.com/G5Olivieri/luau/jose/jwt"
+	"github.com/G5Olivieri/luau/kms"
 )
 
 type RefreshTokenRequest struct {
@@ -52,7 +53,7 @@ func (e RefreshTokenJWTEncoder) Encode(ctx context.Context, r RefreshTokenReques
 		Exp:      now.Add(time.Duration(e.expiresIn) * time.Second).Unix(),
 	}
 
-	signer, err := kms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
+	signer, err := internalkms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
 
 	if err != nil {
 		return "", err
@@ -64,7 +65,7 @@ func (e RefreshTokenJWTEncoder) Encode(ctx context.Context, r RefreshTokenReques
 func (e RefreshTokenJWTEncoder) Decode(ctx context.Context, jwtString string) (*RefreshTokenPayload, error) {
 	var payload *RefreshTokenPayload
 
-	verifier, err := kms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
+	verifier, err := internalkms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,8 @@ import (
 
 	luaujwt "github.com/G5Olivieri/luau/jose/jwt"
 
-	"github.com/G5Olivieri/luau/internal/kms"
+	internalkms "github.com/G5Olivieri/luau/internal/kms"
+	"github.com/G5Olivieri/luau/kms"
 )
 
 type IDTokenRequest struct {
@@ -75,7 +76,7 @@ func (e IDTokenJWTEncoderImpl) Encode(ctx context.Context, r IDTokenRequest) (st
 		// TODO: acr, azp, AtHash
 	}
 
-	signer, err := kms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
+	signer, err := internalkms.NewJWTSignerAdapterByKeyID(ctx, e.kms, e.keyID)
 
 	if err != nil {
 		return "", err
@@ -87,7 +88,7 @@ func (e IDTokenJWTEncoderImpl) Encode(ctx context.Context, r IDTokenRequest) (st
 func (e IDTokenJWTEncoderImpl) Decode(ctx context.Context, jwtString string) (*IDToken, error) {
 	var payload *IDToken
 
-	verifier, err := kms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
+	verifier, err := internalkms.NewJWTVerifierAdapterByKeyID(ctx, e.kms, e.keyID)
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,9 @@ definitions:
         type: string
       username:
         type: string
+    required:
+    - password
+    - username
     type: object
   adapters.restUser:
     properties:
@@ -28,6 +31,9 @@ definitions:
         type: string
       username:
         type: string
+    required:
+    - password
+    - username
     type: object
 info:
   contact: {}

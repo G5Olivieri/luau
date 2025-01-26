@@ -26,6 +26,7 @@ enum JWKType {
   JWK_TYPE_UNSPECIFIED = 0;
   JWK_TYPE_RSA = 1;
   JWK_TYPE_EC = 2;
+  JWK_TYPE_OCT = 3;
 }
 
 enum JWKAlg {
@@ -59,22 +60,34 @@ message JWK {
   JWKType kty = 1;
   JWKUse use = 2;
   JWKAlg alg = 3;
-  JWKKeyOps key_ops = 4;
+  repeated JWKKeyOps key_ops = 4;
 
-  string kid = 5;  // Key ID
+  optional string kid = 5;  // Key ID
 
   // RSA-specific fields
-  bytes n = 6;    // Modulus for RSA keys
-  bytes e = 7;    // Exponent for RSA keys
+  optional string n = 6;    // Modulus for RSA keys
+  optional string e = 7;    // Exponent for RSA keys
+  optional string dp = 8;
+  optional string dq = 9;
+  optional string qi = 10;
 
   // EC-specific fields
-  ECCurve crv = 8;  // Curve for EC keys (e.g., "P-256")
-  bytes x = 9;    // X-coordinate for EC keys
-  bytes y = 10;   // Y-coordinate for EC keys
+  ECCurve crv = 11;  // Curve for EC keys (e.g., "P-256")
+  optional string x = 12;    // X-coordinate for EC keys
+  optional string y = 13;   // Y-coordinate for EC keys
+
+  optional string d = 14;   // EC and RSA D
+
+  // OCT-specific fields
+  optional string k = 15;
 
   // X.509 fields
-  string x5u = 11;     // URI for X.509 certificate
-  repeated bytes x5c = 12;  // Chain of X.509 certificates
-  bytes x5t = 13;     // SHA-1 thumbprint of the X.509 certificate
-  bytes x5t_S256 = 14;  // SHA-256 thumbprint of the X.509 certificate
+  optional string x5u = 16;     // URI for X.509 certificate
+  repeated string x5c = 17;  // Chain of X.509 certificates
+  optional string x5t = 18;     // SHA-1 thumbprint of the X.509 certificate
+  optional string x5t_S256 = 19;  // SHA-256 thumbprint of the X.509 certificate
+}
+
+message JWKS {
+	repeated jose.JWK jwks = 1;
 }

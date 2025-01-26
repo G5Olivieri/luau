@@ -1,20 +1,12 @@
 package kms
 
 import (
-	"context"
-	"errors"
 	"slices"
 
 	"github.com/G5Olivieri/luau/jose/jwk"
-)
 
-var (
-	ErrInvalidKeyAlg       = errors.New("invalid key alg")
-	ErrKeyNotFound         = errors.New("key not found")
-	ErrBadStoredKey        = errors.New("bad stored key")
-	ErrInvalidKeyOperation = errors.New("invalid key operation")
-	ErrInvalidHasher       = errors.New("invalid hasher algorithm")
-	ErrInvalidSignature    = errors.New("invalid signature")
+	"context"
+	"errors"
 )
 
 type KeySpec struct {
@@ -27,7 +19,7 @@ type KeySpec struct {
 type Key interface {
 	GetID() string
 	GetKeySpec() KeySpec
-	JWK() jwk.JWK
+	JWK() (*jwk.JWK, error)
 }
 
 func (spec KeySpec) HasOperation(keyOps jwk.KeyOps) bool {
@@ -60,10 +52,21 @@ func (spec KeySpec) IsMAC() bool {
 	return slices.Contains(sortedSupportedAlgs, spec.Alg)
 }
 
+var (
+	ErrInvalidKeyAlg       = errors.New("invalid key alg")
+	ErrKeyNotFound         = errors.New("key not found")
+	ErrBadStoredKey        = errors.New("bad stored key")
+	ErrInvalidKeyOperation = errors.New("invalid key operation")
+	ErrInvalidHasher       = errors.New("invalid hasher algorithm")
+	ErrInvalidSignature    = errors.New("invalid signature")
+)
+
 type KMS interface {
 	GenerateKey(context.Context, KeySpec) (Key, error)
-	GetPublicKey(context.Context, string) (interface{}, error)
+	GetPublicKey(context.Context, string) (Key, error)
 	Get(context.Context, string) (Key, error)
+	GetPublicKeys(context.Context, int, int) ([]Key, error)
+	List(context.Context, int, int) ([]Key, error)
 	Sign(context.Context, string, []byte) ([]byte, error)
 	Verify(context.Context, string, []byte, []byte) (bool, error)
 	// TODO: Rotate

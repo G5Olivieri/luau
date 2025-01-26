@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,12 +14,13 @@ import (
 	"github.com/G5Olivieri/luau/internal/clients"
 	"github.com/G5Olivieri/luau/internal/config"
 	"github.com/G5Olivieri/luau/internal/csrf"
-	"github.com/G5Olivieri/luau/internal/kms"
+	internalkms "github.com/G5Olivieri/luau/internal/kms"
 	"github.com/G5Olivieri/luau/internal/oidc"
 	oidcencoding "github.com/G5Olivieri/luau/internal/oidc/encoding"
 	"github.com/G5Olivieri/luau/internal/session"
 	"github.com/G5Olivieri/luau/internal/users"
 	"github.com/G5Olivieri/luau/jose/jwk"
+	"github.com/G5Olivieri/luau/kms"
 	"github.com/julienschmidt/httprouter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -124,7 +124,14 @@ func main() {
 
 	codeRepository := oidc.NewInMemoryCodeRepository(make(map[string]*oidc.Code), 5*time.Minute)
 
-	kmsvalue := kms.NewInMemoryKMS()
+	addr = fmt.Sprintf("%s:%d", configValue.KMS.GRPCHost, configValue.KMS.GRPCPort)
+	kmsConn, err := newGrpcConn(addr, configValue.KMS.ServerName, configValue)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer clientConn.Close()
+
+	kmsvalue := internalkms.NewGRPCClientsRepository(kmsConn)
 
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -193,17 +200,7 @@ func main() {
 	r.OPTIONS("/oidc/token", CORSHandler)
 	r.POST("/oidc/login", NoCacheHandler(loginHandler.Handle))
 
-	r.GET("/oidc/.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		jwks, err := kmsvalue.JWKSPublicKeys()
-		if err != nil {
-			log.Println(err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		jwksResponse := make(map[string]interface{})
-		jwksResponse["jwks"] = jwks
-		json.NewEncoder(w).Encode(jwksResponse)
-	})
+	r.GET("/oidc/.well-known/jwks.json", internalkms.NewJwksHandler(kmsvalue).Handler)
 
 	addr = fmt.Sprintf("%s:%d", configValue.HTTPHost, configValue.HTTPPort)
 	log.Printf("Listening %s\n", addr)

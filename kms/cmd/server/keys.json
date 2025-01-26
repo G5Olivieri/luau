@@ -1,0 +1,76 @@
+{
+    "keys": [
+        {
+            "alg": "HS256",
+            "typ": "oct",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "HS384",
+            "typ": "oct",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "HS512",
+            "typ": "oct",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "ES256",
+            "typ": "EC",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "ES384",
+            "typ": "EC",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "ES512",
+            "typ": "EC",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "RS256",
+            "typ": "RSA",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "RS384",
+            "typ": "RSA",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "RS512",
+            "typ": "RSA",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "PS256",
+            "typ": "RSA",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "PS384",
+            "typ": "RSA",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        },
+        {
+            "alg": "PS512",
+            "typ": "RSA",
+            "key_ops": ["sign", "verify"],
+            "use": "sig"
+        }
+    ]
+}
