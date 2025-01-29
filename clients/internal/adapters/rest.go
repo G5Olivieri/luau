@@ -280,7 +280,7 @@ func (r restAdapter) authMiddleware(ctx *gin.Context) {
 	}
 
 	// TODO: get from env
-	verifier, err := NewJWKSVerifierFromUri(ctx, fmt.Sprintf("%s/oidc/.well-known/jwks.json", r.authHost))
+	verifier, err := jwt.NewJWKSVerifierFromUri(ctx, fmt.Sprintf("%s/oidc/.well-known/jwks.json", r.authHost))
 	if err != nil {
 		log.Println(err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)

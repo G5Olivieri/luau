@@ -52,6 +52,8 @@ func GetConfig() (Config, error) {
 		return config, fmt.Errorf("environment ISSUER is missing")
 	}
 
+	config.Issuer = issuer
+
 	httpHost := os.Getenv("HTTP_HOST")
 	if httpHost == "" {
 		return config, fmt.Errorf("environment HTTP_HOST is missing")

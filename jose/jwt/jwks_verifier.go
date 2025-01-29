@@ -1,4 +1,4 @@
-package adapters
+package jwt
 
 import (
 	"context"
@@ -15,14 +15,12 @@ import (
 
 	"github.com/G5Olivieri/luau/jose"
 	"github.com/G5Olivieri/luau/jose/jwk"
-	"github.com/G5Olivieri/luau/jose/jwt"
 )
 
 var (
-	ErrJWTKidNotFound   = errors.New("jwt kid not found")
-	ErrJWTInvalidAlg    = errors.New("jwt alg is invalid")
-	ErrInvalidHasher    = errors.New("invalid hasher algorithm")
-	ErrInvalidSignature = errors.New("invalid signature")
+	ErrJWTKidNotFound = errors.New("jwt kid not found")
+	ErrJWTInvalidAlg  = errors.New("jwt alg is invalid")
+	ErrInvalidHasher  = errors.New("invalid hasher algorithm")
 )
 
 type JWKSVerifier struct {
@@ -30,7 +28,7 @@ type JWKSVerifier struct {
 }
 
 type JWKS struct {
-	Jwks []*jwk.JWK `json:"jwks"`
+	Jwks []*jwk.JWK `json:"keys"`
 }
 
 func NewJWKSVerifierFromUri(ctx context.Context, uri string) (*JWKSVerifier, error) {
@@ -169,7 +167,7 @@ func (v *JWKSVerifier) Verify(ctx context.Context, header jose.JoseRegisteredHea
 	return false, ErrJWTInvalidAlg
 }
 
-var _ jwt.Verifier = &JWKSVerifier{}
+var _ Verifier = &JWKSVerifier{}
 
 func getHasherFromString(alg string) (crypto.Hash, error) {
 	if strings.HasSuffix(alg, "S256") {

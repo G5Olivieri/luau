@@ -26,18 +26,18 @@ services:
       - .:/app
       - ./keys:/opt/luau/certs
 
-  demo:
-    build: .
-    working_dir: /app
-    command: go run demo.go
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    volumes:
-      - "gohome:/go"
-      - "gocache:/root/.cache/go-build"
-      - ./demo:/app
+  # demo:
+  #   build: .
+  #   working_dir: /app
+  #   command: go run demo.go
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - "gohome:/go"
+  #     - "gocache:/root/.cache/go-build"
+  #     - ./demo:/app
 
   clients:
     build: .

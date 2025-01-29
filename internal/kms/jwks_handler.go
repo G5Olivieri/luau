@@ -82,6 +82,8 @@ func (h JwksHandler) Handler(w http.ResponseWriter, r *http.Request, _ httproute
 		jwks = append(jwks, fromJwk(jwk))
 	}
 	jwksResponse := make(map[string][]*restJwk)
-	jwksResponse["jwks"] = jwks
+	jwksResponse["keys"] = jwks
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(jwksResponse)
 }
